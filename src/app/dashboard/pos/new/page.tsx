@@ -18,6 +18,7 @@ export default async function NewSalePage({
   let queueId: string | undefined;
   let prefillItem: PrefillLineItem | undefined;
   let branchId: string | null;
+  let customerPackages: { id: string; name: string; serviceId: string | null; remainingSessions: number }[] = [];
 
   if (searchParams.queueId) {
     const queue = await prisma.queue.findUnique({
@@ -39,6 +40,23 @@ export default async function NewSalePage({
       therapistId: queue.therapistId,
       therapistNickname: queue.therapist?.nickname ?? null,
     };
+
+    if (queue.customerId) {
+      const packages = await prisma.package.findMany({
+        where: {
+          customerId: queue.customerId,
+          status: "ACTIVE",
+          remainingSessions: { gt: 0 },
+          deletedAt: null,
+        },
+      });
+      customerPackages = packages.map((p) => ({
+        id: p.id,
+        name: p.name,
+        serviceId: p.serviceId,
+        remainingSessions: p.remainingSessions,
+      }));
+    }
   } else {
     branchId = await resolveActiveBranchId(session.user, searchParams.branchId);
   }
@@ -57,7 +75,12 @@ export default async function NewSalePage({
         ← กลับ
       </Link>
       <h1 className="text-xl font-semibold">ขายใหม่</h1>
-      <Checkout branchId={branchId} queueId={queueId} prefillItem={prefillItem} />
+      <Checkout
+        branchId={branchId}
+        queueId={queueId}
+        prefillItem={prefillItem}
+        customerPackages={customerPackages}
+      />
     </main>
   );
 }

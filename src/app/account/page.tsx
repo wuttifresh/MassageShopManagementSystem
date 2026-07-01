@@ -16,6 +16,13 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ACTIVE_STATUSES = ["PENDING", "CONFIRMED"];
 
+const PACKAGE_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "ใช้งานได้",
+  EXPIRED: "หมดอายุ",
+  FULLY_USED: "ใช้ครบแล้ว",
+  CANCELLED: "ยกเลิกแล้ว",
+};
+
 const DATE_FORMAT = new Intl.DateTimeFormat("th-TH", {
   weekday: "short",
   day: "numeric",
@@ -33,16 +40,24 @@ export default async function AccountPage() {
   const session = await getCurrentSession();
   if (!session?.user || session.user.role !== "CUSTOMER") redirect("/login?callbackUrl=/account");
 
-  const bookings = await prisma.booking.findMany({
-    where: { customerId: session.user.id, deletedAt: null },
-    include: {
-      serviceOption: { include: { service: true } },
-      therapist: true,
-      queue: true,
-    },
-    orderBy: { startTime: "desc" },
-    take: 20,
-  });
+  const [bookings, membership, packages] = await Promise.all([
+    prisma.booking.findMany({
+      where: { customerId: session.user.id, deletedAt: null },
+      include: {
+        serviceOption: { include: { service: true } },
+        therapist: true,
+        queue: true,
+      },
+      orderBy: { startTime: "desc" },
+      take: 20,
+    }),
+    prisma.membership.findUnique({ where: { customerId: session.user.id } }),
+    prisma.package.findMany({
+      where: { customerId: session.user.id, deletedAt: null },
+      include: { service: true },
+      orderBy: { purchasedAt: "desc" },
+    }),
+  ]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-4">
@@ -50,9 +65,34 @@ export default async function AccountPage() {
         <div>
           <h1 className="text-xl font-semibold">บัญชีของฉัน</h1>
           <p className="text-sm text-neutral-500">สวัสดี {session.user.name}</p>
+          {membership && (
+            <p className="text-sm text-neutral-500">
+              สมาชิก {membership.tier} · {membership.points} แต้ม
+            </p>
+          )}
         </div>
         <SignOutButton />
       </header>
+
+      {packages.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium text-neutral-500">คอร์สของฉัน</h2>
+          {packages.map((pkg) => (
+            <div key={pkg.id} className="flex items-center justify-between rounded-xl border border-neutral-200 p-4">
+              <div>
+                <p className="font-medium">{pkg.name}</p>
+                <p className="text-sm text-neutral-500">
+                  เหลือ {pkg.remainingSessions}/{pkg.totalSessions} ครั้ง
+                  {pkg.service ? ` · ${pkg.service.name}` : " · ใช้ได้ทุกบริการ"}
+                </p>
+              </div>
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs">
+                {PACKAGE_STATUS_LABEL[pkg.status] ?? pkg.status}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
 
       <Link
         href="/book"
