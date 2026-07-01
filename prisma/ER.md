@@ -280,3 +280,35 @@ Postgres ไม่มีใน local Postgres ธรรมดา รัน migra
 ```sql
 alter publication supabase_realtime add table queues;
 ```
+
+## Phase 5 — จัดการหมอนวด & บริการ
+
+**สิทธิ์**: OWNER และ STAFF จัดการหมอนวด/บริการได้เท่ากัน (ไม่ได้แยกสิทธิ์ระดับ field เช่น
+"STAFF แก้ค่ามือไม่ได้" — ตัดสินใจให้สอดคล้องกับ Phase 4 ที่ OWNER/STAFF มีสิทธิ์เท่ากันบน
+`/dashboard` อยู่แล้ว ไม่อยากเพิ่ม permission tier ใหม่ที่ไม่มีที่ไหนในระบบใช้อยู่ก่อน) หมอนวดยังคง
+ผูกกับสาขาเดียวตาม Phase 1 (STAFF จัดการได้เฉพาะสาขาตัวเอง), บริการเป็น catalog กลางไม่ผูกสาขา
+จึงไม่มีการเช็ค branch สำหรับ service actions
+
+**"ลบ" หมอนวด/บริการ = ปิดใช้งาน ไม่ใช่ hard delete**: ไม่มีปุ่ม "ลบ" จริงใน UI เลย — หมอนวดใช้
+`status` (`ACTIVE`/`ON_LEAVE`/`INACTIVE`) และบริการ/ตัวเลือกใช้ `isActive` ที่มีอยู่แล้วตั้งแต่
+Phase 1 แทน สอดคล้องกับ hard rule #2 และป้องกันข้อมูลสูญหายโดยไม่ตั้งใจ (แถวยังอยู่ครบสำหรับ
+ประวัติ transaction เก่าที่อ้างถึง)
+
+**Rating เป็น read-only**: `Therapist.ratingAverage`/`ratingCount` ยังไม่มีกลไกเก็บคะแนนจริง
+(ไม่มี `Review` model ใน scope ปัจจุบัน) จึงแสดงผลอย่างเดียวในหน้า list ("ยังไม่มี" เมื่อ count = 0)
+ไม่เปิดให้แก้ไขค่าตรงๆ เพราะจะเป็นข้อมูลปลอมที่ไม่ได้มาจากลูกค้าจริง — ถ้าต้องการ ต้องเพิ่ม
+`Review` model + flow ให้ลูกค้าให้คะแนนหลังใช้บริการในเฟสถัดไป
+
+**โปรโมชั่น**: เพิ่มแค่ฟิลด์ `ServiceOption.promoPrice` (nullable, migration
+`20260701075446_add_service_option_promo_price`) แทนที่จะสร้างโมเดล `Promotion` แยก — ไม่มี
+กำหนดวันเริ่ม/สิ้นสุดหรือเงื่อนไขอื่น staff เปิด/ปิดโปรโมชั่นเองด้วยมือผ่านการใส่/ลบราคาโปรโมชั่น
+ถ้าต้องการโปรโมชั่นแบบมีกำหนดเวลา/เงื่อนไขซับซ้อนกว่านี้ ค่อยขยายเป็นโมเดลแยกทีหลัง ราคาโปรโมชั่น
+แสดงผลแล้วทั้งใน `/book` (ฝั่งลูกค้า), หน้าเพิ่มคิว walk-in, และหน้า list บริการ
+
+**`src/lib/staff-auth.ts` / `src/lib/branch-scope.ts`**: ดึง logic การเช็คสิทธิ์ staff/branch และ
+การ resolve สาขาที่ active ออกมาเป็น helper กลาง (ใช้ซ้ำระหว่าง `/dashboard`,
+`/dashboard/therapists`, และ Phase 4's `dashboard/actions.ts` ที่ refactor มาใช้ helper เดียวกัน)
+
+**ตารางเวร** (`/dashboard/therapists/[id]/schedule`) แสดง 14 วันข้างหน้า แต่ละวัน save แยกเป็น
+แถวอิสระ (ไม่ต้อง submit ทีเดียวทั้งหมด) upsert ลง `TherapistSchedule` ตรงๆ ตาม unique constraint
+`(therapistId, date)` ที่มีอยู่แล้วตั้งแต่ Phase 1

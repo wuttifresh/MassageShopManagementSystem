@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBooking } from "./actions";
 
 type Branch = { id: string; name: string; slug: string; address: string | null };
-type ServiceOption = { id: string; durationMinutes: number; price: string };
+type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; description: string | null; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string; bio: string | null };
 
@@ -164,7 +164,7 @@ export function BookingWizard() {
           items={selectedService.options.map((o) => ({
             id: o.id,
             label: `${o.durationMinutes} นาที`,
-            sub: `฿${o.price}`,
+            sub: o.promoPrice ? `฿${o.promoPrice} (ปกติ ฿${o.price})` : `฿${o.price}`,
           }))}
           onSelect={(id) => {
             setServiceOptionId(id);
@@ -241,7 +241,14 @@ export function BookingWizard() {
             <Row label="หมอนวด" value={selectedTherapist ? selectedTherapist.nickname : "คนไหนก็ได้"} />
             <Row label="วันที่" value={DAY_FORMAT.format(new Date(date))} />
             <Row label="เวลา" value={time} />
-            <Row label="ราคา" value={`฿${selectedOption.price}`} />
+            <Row
+              label="ราคา"
+              value={
+                selectedOption.promoPrice
+                  ? `฿${selectedOption.promoPrice} (ปกติ ฿${selectedOption.price})`
+                  : `฿${selectedOption.price}`
+              }
+            />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
