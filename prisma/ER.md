@@ -388,3 +388,67 @@ test ข้างบน) แก้ด้วยการ retry สร้างเ
 array ของชื่อ column เหมือน MySQL เสมอไป บางทีเป็นชื่อ constraint แบบ string เฉยๆ เลยต้องเช็ค
 ทั้งสองแบบ + fallback เช็คข้อความ error ด้วย) **ทดสอบซ้ำแล้วว่าหลังแก้ ไม่มี 500 อีก** ได้ error
 message ที่เป็นมิตรแทน
+
+## Phase 8 — รายงาน & Multi-branch
+
+**รายงานยอดขาย** (`src/lib/reports.ts`, `getSalesReport({branchId, startDate, endDate})`): ดึง
+`Transaction` ที่ `status: PAID` และ `deletedAt: null` ในช่วงวันที่ที่เลือก พร้อม nested
+`items.serviceOption.service` และ `items.therapist` แล้ว aggregate ในโค้ด (ไม่ใช่ raw SQL
+`GROUP BY`) — เพราะข้อมูลปริมาณระดับร้านนวดเดี่ยว/ไม่กี่สาขาไม่ถึงขนาดต้องพึ่ง DB-side
+aggregation, และการ aggregate ใน JS ทำให้ reuse โครงสร้างข้อมูลเดียวกันได้ทั้งหน้าเว็บและไฟล์ Excel
+export ได้ง่ายกว่า ผลลัพธ์แบ่งเป็น `summary` (ยอดรวม/VAT รวม/ค่ามือรวม/จำนวนบิล), `byService`,
+`byTherapist`, `byDay`
+
+**สิทธิ์ดูรายงาน**: OWNER เลือกดูได้ทุกสาขาหรือทุกสาขารวมกัน (`branchId` ไม่บังคับ), STAFF ถูกล็อก
+ให้เห็นเฉพาะสาขาตัวเองเสมอ (เช็คที่ทั้งหน้า `/dashboard/reports` และ route
+`/api/reports/export` แยกกัน เพราะเป็นคนละ request คนละที่ต้องเช็คเอง)
+
+**Export Excel** (`/api/reports/export`, ใช้ไลบรารี `xlsx`/SheetJS): สร้าง workbook 4 ชีต
+(สรุป/ตามบริการ/ตามหมอนวด/รายวัน) จากผลลัพธ์ `getSalesReport` เดียวกันกับที่หน้าเว็บใช้ (ไม่มี
+aggregation logic ซ้ำสองที่) คืนเป็น `.xlsx` ผ่าน `NextResponse` — ต้องห่อ `Buffer` ด้วย
+`new Uint8Array(buffer)` ก่อนส่ง เพราะ Next.js's `BodyInit` type ไม่รับ `Buffer` ตรงๆ
+
+**Multi-branch — จัดการสาขา** (`/dashboard/branches`, OWNER เท่านั้น): CRUD มาตรฐานเหมือน
+หมอนวด/บริการใน Phase 5 — ไม่มีการลบจริง มีแต่ปิดใช้งาน (`isActive`) ตรวจ `slug` ไม่ซ้ำและเป็น
+รูปแบบ `^[a-z0-9-]+$` เท่านั้น (ใช้เป็น URL-safe identifier ในอนาคตถ้าต้องการ subdomain/path
+แยกตามสาขา) ทุกการสร้าง/แก้ไขเขียน `AuditLog`
+
+**จัดการบัญชีพนักงาน** (`/dashboard/staff`, OWNER เท่านั้น): สร้างบัญชี `User` role `STAFF` ใหม่
+พร้อม hash รหัสผ่านด้วย bcrypt, ผูกกับสาขา (`branchId`) ตั้งแต่ตอนสร้าง แก้ไขภายหลังทำได้แค่
+"ย้ายสาขา" กับ "เปิด/ปิดใช้งาน" (`isActive`) เท่านั้น — ไม่ให้แก้อีเมล/รหัสผ่านผ่านหน้านี้เพื่อลด
+ความเสี่ยงเรื่อง auth (ถ้าต้องการรีเซ็ตรหัสผ่านค่อยทำ flow แยกในเฟสถัดไป)
+
+**Bug ร้ายแรงที่เจอระหว่างทดสอบด้วย Playwright — infinite redirect loop**: ทุกหน้า OWNER-only
+(ทั้งของเดิมและที่เพิ่มใหม่ใน Phase 8) เดิมเช็ค role ที่ page-level แล้ว `redirect(`/login?
+callbackUrl=${path}`)` เมื่อเจอ session ที่ login อยู่แล้วแต่ role ไม่ตรง (เช่น STAFF เปิดหน้า
+`/dashboard/branches`) ปัญหาคือ `/login` page เดิมเช็คแค่ "มี session ไหม" แล้ว honor
+`callbackUrl` ที่ส่งมาทันทีโดยไม่สนใจว่า role ตรงกับหน้านั้นหรือเปล่า — STAFF ที่ login อยู่แล้วโดน
+bounce ไป `/login?callbackUrl=/dashboard/branches` แล้ว `/login` เห็นว่ามี session อยู่แล้วก็
+redirect กลับไป `/dashboard/branches` ทันที ซึ่งวนกลับไปเช็ค role อีกรอบ **เป็น infinite loop**
+
+บั๊กนี้ค้างมาตั้งแต่ Phase 2 (pattern เดียวกันอยู่ใน `middleware.ts` ตั้งแต่ตอนนั้น) แต่ไม่เคยถูกจับ
+ได้เพราะทุก Phase ก่อนหน้าทดสอบด้วย `curl` ซึ่ง**ไม่ follow redirect โดย default** เลยเห็นแค่ hop
+แรก (307 → `/login?callbackUrl=...`) ไม่รู้ว่ามันจะวนต่อ จนมาเจอจริงตอนทดสอบ Phase 8 ด้วย
+Playwright's `page.goto()` ซึ่ง follow redirect จริงและโยน `net::ERR_TOO_MANY_REDIRECTS` ออกมา
+ให้เห็นชัดเจน — เป็นตัวอย่างว่าทำไมการทดสอบ flow จริงผ่านเบราว์เซอร์ถึงสำคัญ ไม่ใช่แค่เช็ค response
+code เดี่ยวๆ ด้วย curl
+
+**แก้ 3 จุด**:
+1. `src/app/login/page.tsx` — session ที่ login อยู่แล้วจะไม่ honor `callbackUrl` อีกต่อไป
+   redirect ไปหน้า home ตาม role (`ROLE_HOME[role]`) เสมอ เพราะทางเดียวที่จะมาเจอ `/login` ทั้งที่
+   login อยู่แล้วคือโดน bounce มาจาก role ผิด — การ redirect กลับตาม `callbackUrl` มีแต่จะวนซ้ำ
+2. `src/middleware.ts` — เพิ่ม `ROLE_HOME` map แยก logic เป็นสองทาง: ไม่มี session → ไป `/login`
+   เหมือนเดิม, มี session แต่ role ไม่ตรงกับ route ที่ป้องกันไว้ → ส่งไปหน้า home ของ role นั้นตรงๆ
+   (ไม่ผ่าน `/login` เลย) ทั้งแก้ปัญหาและได้ UX ที่ดีกว่าเดิมด้วย (ไม่ต้องเห็นหน้า login ทั้งที่ login
+   อยู่แล้ว)
+3. `src/lib/require-owner-page.ts` (ใหม่) — helper กลางแทนที่ pattern
+   `if (!session?.user || session.user.role !== "OWNER") redirect(...)` ที่กระจายซ้ำอยู่ 6 หน้า
+   (`branches/page.tsx`, `branches/[id]/page.tsx`, `branches/new/page.tsx`, `staff/page.tsx`,
+   `staff/[id]/page.tsx`, `staff/new/page.tsx`) เพราะ middleware เดิมป้องกัน `/dashboard/*` ทั้งกลุ่ม
+   ด้วย role ชุด OWNER+STAFF ที่กว้างกว่า — หน้าเหล่านี้ต้องเช็ค OWNER-only เพิ่มเองที่ page-level
+   จึงยังต้องระวัง pattern เดิมซ้ำอยู่ ถ้าไม่มี session เลยยังส่งไป `/login` ตามปกติ (กรณีนี้ไม่มี
+   loop เพราะไม่มี session ให้ bounce) แต่ถ้ามี session แล้ว role ผิดจะส่งไป `/dashboard` ตรงๆ
+
+ทดสอบซ้ำหลังแก้ด้วย Playwright: STAFF เปิด `/dashboard/branches` และ `/dashboard/staff` แล้ว
+landing ที่ `/dashboard` (ไม่ loop), OWNER สร้างสาขาใหม่ + สร้างพนักงานใหม่ผูกกับสาขานั้นสำเร็จ
+ครบ flow ตรวจสอบข้อมูลใน DB ตรงกับที่คาดไว้ พร้อม `AuditLog` ครบทั้งสอง action

@@ -2,7 +2,7 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 7 — สมาชิก / คอร์ส / CRM** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 8 — รายงาน & Multi-branch** เสร็จแล้ว
 
 ## Tech Stack
 
@@ -105,6 +105,23 @@ npm run build        # production build
   ทดสอบแล้วด้วย concurrent request จริงว่ากันการตัดครั้งซ้ำได้ (hard rule #5) ดูรายละเอียดทั้งหมด
   รวมถึง bug คอขวดเรื่องเลขที่ใบเสร็จที่เจอและแก้ระหว่างทดสอบใน `prisma/ER.md` หัวข้อ
   "Phase 7 — สมาชิก / คอร์ส / CRM"
+
+## รายงาน & Multi-branch (Phase 8)
+
+- `/dashboard/reports` — สรุปยอดขาย (OWNER/STAFF) เลือกช่วงวันที่ + สาขา (OWNER เลือกได้ทุกสาขา,
+  STAFF ล็อกสาขาตัวเอง) แสดงยอดขายรวม/VAT/ค่ามือรวม + ตารางแยกตามบริการ/หมอนวด/รายวัน
+  ปุ่ม "ส่งออก Excel" → `/api/reports/export` (`src/lib/reports.ts` คำนวณ aggregate, ใช้ไลบรารี
+  `xlsx` สร้างไฟล์ 4 ชีต)
+- `/dashboard/branches` — จัดการสาขา (OWNER เท่านั้น): สร้าง/แก้ไข ชื่อ/slug/ที่อยู่/เบอร์/เวลาเปิด-ปิด/
+  สถานะเปิดใช้งาน (soft — ไม่มีการลบจริง)
+- `/dashboard/staff` — จัดการบัญชีพนักงาน (OWNER เท่านั้น): สร้างบัญชี STAFF ใหม่ (อีเมล/รหัสผ่าน/สาขา)
+  แก้ไขการมอบหมายสาขา/สถานะใช้งานภายหลัง — ทุก action เขียน `AuditLog`
+- **Bug ที่เจอและแก้ระหว่างทดสอบ**: หน้า OWNER-only เดิม redirect ผู้ใช้ที่ login แล้วแต่ role ผิดไปที่
+  `/login?callbackUrl=<หน้าเดิม>` ซึ่งทำให้เกิด infinite redirect loop (เพราะ `/login` ของ session ที่ login
+  อยู่แล้วจะ redirect กลับไปตาม `callbackUrl` ทันที) แก้โดยไม่ยอมให้ session ที่ login อยู่แล้ว redirect ตาม
+  `callbackUrl` อีกต่อไป (`/login` จะไปหน้า home ตาม role เสมอ), เพิ่ม `ROLE_HOME` ใน `middleware.ts` ให้ role
+  ผิดแต่ login แล้วไปหน้า home ของตัวเองตรงๆ ไม่ผ่าน `/login`, และรวม logic ตรวจ OWNER ที่หน้า page-level ไว้ที่
+  `src/lib/require-owner-page.ts` ดูรายละเอียดเต็มใน `prisma/ER.md` หัวข้อ "Phase 8 — รายงาน & Multi-branch"
 
 ## Hard rules (บังคับทุก Phase)
 

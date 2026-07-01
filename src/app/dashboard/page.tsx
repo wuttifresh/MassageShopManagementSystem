@@ -100,6 +100,19 @@ export default async function DashboardPage({
         <Link href="/dashboard/services" className="rounded-lg border border-neutral-300 px-3 py-1.5">
           จัดการบริการ
         </Link>
+        <Link href="/dashboard/reports" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+          รายงาน
+        </Link>
+        {session.user.role === "OWNER" && (
+          <>
+            <Link href="/dashboard/branches" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+              จัดการสาขา
+            </Link>
+            <Link href="/dashboard/staff" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+              พนักงาน
+            </Link>
+          </>
+        )}
       </nav>
 
       {session.user.role === "OWNER" && (
