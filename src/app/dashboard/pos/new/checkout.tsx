@@ -15,6 +15,13 @@ export type PrefillLineItem = {
   therapistNickname: string | null;
 };
 
+export type CustomerPackage = {
+  id: string;
+  name: string;
+  serviceId: string | null;
+  remainingSessions: number;
+};
+
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string };
@@ -25,6 +32,8 @@ type LineItem = {
   serviceOptionId: string;
   therapistId: string;
   quantity: number;
+  /// "" = pay with the selected payment method below; otherwise the id of the Package to redeem.
+  packageId: string;
 };
 
 const PAYMENT_METHODS: { value: string; label: string }[] = [
@@ -44,10 +53,12 @@ export function Checkout({
   branchId,
   queueId,
   prefillItem,
+  customerPackages,
 }: {
   branchId: string;
   queueId?: string;
   prefillItem?: PrefillLineItem;
+  customerPackages: CustomerPackage[];
 }) {
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
@@ -77,6 +88,7 @@ export function Checkout({
         serviceOptionId: prefillItem.serviceOptionId,
         therapistId: prefillItem.therapistId ?? "",
         quantity: 1,
+        packageId: "",
       },
     ]);
     loadTherapists(parentService.id);
@@ -93,7 +105,10 @@ export function Checkout({
   }
 
   function addLineItem() {
-    setItems((rows) => [...rows, { key: nextKey(), serviceId: "", serviceOptionId: "", therapistId: "", quantity: 1 }]);
+    setItems((rows) => [
+      ...rows,
+      { key: nextKey(), serviceId: "", serviceOptionId: "", therapistId: "", quantity: 1, packageId: "" },
+    ]);
   }
 
   function removeLineItem(key: string) {
@@ -108,8 +123,13 @@ export function Checkout({
     return services.find((s) => s.id === serviceId)?.options.find((o) => o.id === serviceOptionId);
   }
 
+  function eligiblePackages(serviceId: string): CustomerPackage[] {
+    return customerPackages.filter((p) => !p.serviceId || p.serviceId === serviceId);
+  }
+
   const { subtotal, vatAmount, totalAmount } = useMemo(() => {
     const sub = items.reduce((sum, item) => {
+      if (item.packageId) return sum; // paid for via the package already, ฿0 charged today
       const option = findOption(item.serviceId, item.serviceOptionId);
       if (!option) return sum;
       const unitPrice = Number(option.promoPrice ?? option.price);
@@ -140,6 +160,7 @@ export function Checkout({
       serviceOptionId: i.serviceOptionId,
       therapistId: i.therapistId,
       quantity: i.quantity,
+      packageId: i.packageId || null,
     }));
 
     const result = await createTransaction({
@@ -165,6 +186,7 @@ export function Checkout({
           const service = services.find((s) => s.id === item.serviceId);
           const option = findOption(item.serviceId, item.serviceOptionId);
           const therapists = therapistsByService[item.serviceId] ?? [];
+          const packages = item.serviceId ? eligiblePackages(item.serviceId) : [];
 
           return (
             <div key={item.key} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 text-sm">
@@ -172,7 +194,7 @@ export function Checkout({
                 value={item.serviceId}
                 onChange={(e) => {
                   const serviceId = e.target.value;
-                  updateLineItem(item.key, { serviceId, serviceOptionId: "", therapistId: "" });
+                  updateLineItem(item.key, { serviceId, serviceOptionId: "", therapistId: "", packageId: "" });
                   if (serviceId) loadTherapists(serviceId);
                 }}
                 className="rounded-lg border border-neutral-300 p-2"
@@ -215,9 +237,26 @@ export function Checkout({
                 </select>
               )}
 
+              {packages.length > 0 && (
+                <select
+                  value={item.packageId}
+                  onChange={(e) => updateLineItem(item.key, { packageId: e.target.value })}
+                  className="rounded-lg border border-neutral-300 p-2"
+                >
+                  <option value="">ชำระด้วยเงิน/โอน/บัตร</option>
+                  {packages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      ใช้คอร์ส: {p.name} (เหลือ {p.remainingSessions} ครั้ง)
+                    </option>
+                  ))}
+                </select>
+              )}
+
               {option && (
                 <p className="text-neutral-500">
-                  รวม: ฿{Number(option.promoPrice ?? option.price) * item.quantity}
+                  {item.packageId
+                    ? "฿0 (ตัดจากคอร์ส)"
+                    : `รวม: ฿${Number(option.promoPrice ?? option.price) * item.quantity}`}
                 </p>
               )}
 

@@ -91,6 +91,9 @@ export default async function DashboardPage({
         <Link href="/dashboard/pos" className="rounded-lg border border-neutral-300 px-3 py-1.5">
           POS / ชำระเงิน
         </Link>
+        <Link href="/dashboard/customers" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+          ลูกค้า
+        </Link>
         <Link href="/dashboard/therapists" className="rounded-lg border border-neutral-300 px-3 py-1.5">
           จัดการหมอนวด
         </Link>
