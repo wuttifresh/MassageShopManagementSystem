@@ -201,3 +201,41 @@ login ใหม่ (default 30 วัน) — ถ้าต้องการ rev
 **Demo credentials** (จาก `prisma/seed.ts`, ใช้ทดสอบเท่านั้น ห้ามใช้ค่านี้ใน production):
 `owner@massageshop.test` / `staff@massageshop.test` / `nok@massageshop.test` /
 `waew@massageshop.test` / `oi@massageshop.test` — รหัสผ่านเดียวกันหมด `Password123!`
+
+## Phase 3 — ระบบจองคิว (Customer)
+
+**สถาปัตยกรรม:** `src/lib/availability.ts` เป็นแกนกลางคำนวณ slot ว่างทั้งหมด อ่านจาก
+`TherapistSchedule` (วันทำงานจริงของหมอนวด) ลบด้วยช่วงเวลาที่ถูกจองแล้ว (`Booking` สถานะ
+PENDING/CONFIRMED) แล้ว generate ช่อง 30 นาที ที่เว้นระยะล่วงหน้าอย่างน้อย 1 ชั่วโมงจากเวลาปัจจุบัน
+ไฟล์นี้ถูกเรียกทั้งจาก Route Handler (`/api/availability` ให้ UI fetch มาแสดง) และจาก server action
+ตอนสร้าง/เลื่อนการจอง (เพื่อ validate ซ้ำก่อนเขียนจริง)
+
+**"คนไหนก็ได้" ถูก assign ทันทีตอนจอง ไม่ปล่อยว่างไว้** — เดิมคิดว่า `Booking.therapistId = null`
+จะหมายถึง "ยังไม่ระบุ รอ staff มา assign" แต่พบว่าถ้าปล่อย null จริง จะไม่มีอะไรป้องกันการจองเกิน
+ความจุของสาขา เพราะ EXCLUDE constraint (hard rule #6) เช็คเฉพาะแถวที่ `therapist_id IS NOT NULL`
+เท่านั้น จึงเปลี่ยนมาให้ `findAvailableTherapist()` เลือกหมอนวดที่ว่างจริงให้ทันทีตอนยืนยันจอง
+(ทั้งกรณีลูกค้าระบุคนที่ต้องการ และกรณี "คนไหนก็ได้") ทำให้ทุก booking ที่ยืนยันแล้วมี therapist_id
+จริงเสมอ และพึ่งพา DB constraint ได้เต็มที่ — `therapistId` ในสกีมายังเป็น nullable ไว้เผื่อ
+edge case ในอนาคต แต่ flow ปกติของ Phase 3 จะไม่ปล่อยว่าง
+
+**การจัดการ race condition แบบ 2 ชั้น:** (1) เช็ค availability ในแอปก่อนเขียน DB (UX ที่ดี ตอบเร็ว)
+(2) ถ้าสอง request ชนกันจริง (สอง client ยืนยันพร้อมกันภายในหน้าต่างเวลาแคบมาก) DB EXCLUDE
+constraint จะ reject การ insert ที่สอง ด้วย SQLSTATE `23P01` — โค้ดจับ error นี้ผ่าน
+`isDriverAdapterError()` จาก `@prisma/driver-adapter-utils` (ตรวจเจอจริงว่า error ที่ Postgres
+โยนกลับมาไม่ใช่ `PrismaClientKnownRequestError` ตามที่คาดตอนแรก แต่เป็น `DriverAdapterError`
+เพราะเป็น constraint ที่ Prisma ไม่รู้จักเอง) แล้วแปลงเป็นข้อความไทยที่เป็นมิตร แทนที่จะ error 500
+**ทดสอบแล้วจริงด้วย concurrent request สองอันพร้อมกัน (Playwright, สองหมอนวดคนเดียวกัน
+ช่วงเวลาเดียวกัน) ยืนยันว่ามีแค่ 1 booking ที่สำเร็จ อีกอันได้ error message ไม่ crash**
+
+**เลื่อนนัด (reschedule)** สร้าง `Booking` แถวใหม่เชื่อมกับแถวเดิมผ่าน `rescheduledFromId`,
+เปลี่ยนสถานะแถวเดิมเป็น `RESCHEDULED` (ไม่ใช่ `CANCELLED`) เพื่อแยกความแตกต่างจากการยกเลิกจริง
+พยายามคงหมอนวดคนเดิมไว้ก่อน (ไม่สลับคนอัตโนมัติ) ถ้าคนเดิมไม่ว่างช่วงใหม่ ให้ลูกค้าเลือกเวลาอื่น
+
+**"realtime" ใน Phase 3 = fetch สดทุกครั้งที่เปลี่ยนตัวเลือก** ไม่ใช่ WebSocket/Supabase Realtime
+push — เพียงพอสำหรับฟอร์มจองที่ผู้ใช้เลือกแล้วค่อยดูผลลัพธ์ (ไม่ได้เฝ้าหน้าจอรอ) ส่วน Supabase
+Realtime ตามที่ระบุใน tech stack จะใช้จริงจังใน Phase 4 (dashboard คิว realtime ที่ staff เฝ้าหน้าจอ
+ทั้งวัน ซึ่งคุ้มค่ากว่ามากที่จะ push แทน poll)
+
+**หน้าสถานะคิว (`/account`)** แสดงรายการ `Booking` ของลูกค้าพร้อมสถานะ และซ้อนสถานะ `Queue`
+ทับได้ถ้ามีการเช็คอินแล้ว (Phase 4 จะเป็นคนสร้างแถว `Queue`) — ตอนนี้ยังไม่มี flow เช็คอิน จึงจะเห็น
+แค่สถานะ booking (ยืนยันแล้ว/ยกเลิกแล้ว/เลื่อนนัดแล้ว) เวลารอจริงจะปรากฏหลัง Phase 4 เสร็จ

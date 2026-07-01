@@ -2,7 +2,7 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 2 — Auth & Roles** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 3 — ระบบจองคิว (Customer)** เสร็จแล้ว
 
 ## Tech Stack
 
@@ -52,6 +52,17 @@ npm run build        # production build
   `owner@massageshop.test` / `staff@massageshop.test` / `nok@massageshop.test` — รหัสผ่าน
   `Password123!` ทดสอบ LINE Login ต้องสร้าง LINE Login channel เองแล้วใส่
   `LINE_CLIENT_ID`/`LINE_CLIENT_SECRET` ใน `.env`
+
+## ระบบจองคิว (Phase 3)
+
+- `/book` — ฟอร์มจอง mobile-first (CUSTOMER เท่านั้น): สาขา → บริการ → ระยะเวลา → หมอนวด
+  (หรือ "คนไหนก็ได้") → วัน-เวลา → ยืนยัน
+- `/account` — รายการการจองของฉัน พร้อมยกเลิก/เลื่อนนัด (`/account/bookings/[id]/reschedule`)
+- `src/lib/availability.ts` — แกนคำนวณ slot ว่างทั้งหมด, `src/app/book/actions.ts` /
+  `src/app/account/actions.ts` — server actions สร้าง/ยกเลิก/เลื่อนการจอง
+- กัน double-booking สองชั้น: เช็ค availability ในแอปก่อน (UX) + PostgreSQL `EXCLUDE` constraint
+  เป็นด่านสุดท้ายที่ระดับ DB (ทดสอบจริงด้วย concurrent request แล้ว) ดูรายละเอียดใน `prisma/ER.md`
+  หัวข้อ "Phase 3 — ระบบจองคิว (Customer)"
 
 ## Hard rules (บังคับทุก Phase)
 
