@@ -1,0 +1,119 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { rescheduleBooking } from "@/app/account/actions";
+
+const DAY_COUNT = 14;
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("th-TH", { weekday: "short", timeZone: "UTC" });
+const DAY_FORMAT = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" });
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function nextDays(count: number): Date[] {
+  const today = new Date();
+  const base = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  return Array.from({ length: count }, (_, i) => new Date(base.getTime() + i * 86_400_000));
+}
+
+export function ReschedulePicker({
+  bookingId,
+  branchId,
+  serviceId,
+  durationMinutes,
+  therapistId,
+}: {
+  bookingId: string;
+  branchId: string;
+  serviceId: string;
+  durationMinutes: number;
+  therapistId: string | null;
+}) {
+  const router = useRouter();
+  const days = useMemo(() => nextDays(DAY_COUNT), []);
+
+  const [date, setDate] = useState<string | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!date) return;
+    setSlots([]);
+    const params = new URLSearchParams({
+      branchId,
+      serviceId,
+      date,
+      durationMinutes: String(durationMinutes),
+    });
+    if (therapistId) params.set("therapistId", therapistId);
+
+    fetch(`/api/availability?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data: { slots: string[] }) => setSlots(data.slots));
+  }, [date, branchId, serviceId, durationMinutes, therapistId]);
+
+  async function handlePick(time: string) {
+    if (!date) return;
+    setIsSubmitting(true);
+    setError(null);
+
+    const result = await rescheduleBooking(bookingId, date, time);
+
+    setIsSubmitting(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    router.push("/account");
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {days.map((d) => {
+          const value = isoDate(d);
+          const selected = value === date;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setDate(value)}
+              className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 text-xs ${
+                selected ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"
+              }`}
+            >
+              <span>{WEEKDAY_FORMAT.format(d)}</span>
+              <span className="font-medium">{DAY_FORMAT.format(d)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {date && (
+        <div className="grid grid-cols-3 gap-2">
+          {slots.length === 0 && (
+            <p className="col-span-3 text-center text-sm text-neutral-400">
+              ไม่มีคิวว่างในวันนี้ ลองเลือกวันอื่นดูนะคะ
+            </p>
+          )}
+          {slots.map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handlePick(slot)}
+              className="rounded-lg border border-neutral-300 py-2 text-sm hover:border-neutral-900 disabled:opacity-50"
+            >
+              {slot}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}

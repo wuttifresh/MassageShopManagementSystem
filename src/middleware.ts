@@ -7,6 +7,7 @@ const PROTECTED_ROUTES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/dashboard", roles: [Role.OWNER, Role.STAFF] },
   { prefix: "/therapist", roles: [Role.THERAPIST] },
   { prefix: "/account", roles: [Role.CUSTOMER] },
+  { prefix: "/book", roles: [Role.CUSTOMER] },
 ];
 
 export default withAuth(
@@ -34,5 +35,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/therapist/:path*", "/account/:path*"],
+  matcher: ["/dashboard/:path*", "/therapist/:path*", "/account/:path*", "/book/:path*"],
 };
