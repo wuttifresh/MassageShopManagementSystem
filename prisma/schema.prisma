@@ -1,0 +1,605 @@
+// Massage Shop Management System — Phase 1 schema
+// See prisma/ER.md for the full ER diagram and data-flow explanation.
+//
+// Hard rules enforced in this schema:
+//  1. Money never uses float — all money fields are `Decimal @db.Decimal(10, 2)` (THB, 2 decimals).
+//  2. Financial / booking records are never hard-deleted — they carry `deletedAt` (soft delete).
+//  3. AuditLog captures who/what/when/before/after for every financial + queue-editing action.
+//  4. Therapist commission is snapshotted on TransactionItem at sale time (never re-derived from
+//     the therapist's *current* rate), so historical payouts stay correct even if rates change later.
+//  5. Package (course) redemption goes through PackageUsage rows written inside the same DB
+//     transaction that decrements Package.remainingSessions (see prisma/ER.md → atomic package cut).
+//  6. Double-booking is blocked at the database level by a PostgreSQL EXCLUDE constraint on
+//     Booking (see prisma/migrations/.../migration.sql), not just application logic.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  STAFF
+  THERAPIST
+  CUSTOMER
+
+  @@map("role")
+}
+
+enum BookingSource {
+  ONLINE
+  WALK_IN
+  PHONE
+  ADMIN
+
+  @@map("booking_source")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+  RESCHEDULED
+
+  @@map("booking_status")
+}
+
+enum QueueStatus {
+  WAITING
+  ASSIGNED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+
+  @@map("queue_status")
+}
+
+enum TherapistStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+
+  @@map("therapist_status")
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+
+  @@map("commission_type")
+}
+
+enum ScheduleStatus {
+  WORKING
+  DAY_OFF
+  LEAVE
+
+  @@map("schedule_status")
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  PROMPTPAY
+  CARD
+
+  @@map("payment_method")
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  VOIDED
+  REFUNDED
+
+  @@map("transaction_status")
+}
+
+enum PackageStatus {
+  ACTIVE
+  EXPIRED
+  FULLY_USED
+  CANCELLED
+
+  @@map("package_status")
+}
+
+enum MembershipTier {
+  STANDARD
+  SILVER
+  GOLD
+  PLATINUM
+
+  @@map("membership_tier")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VOID
+  REFUND
+  CHECK_IN
+  CHECK_OUT
+  ASSIGN_THERAPIST
+  CANCEL_BOOKING
+  RESCHEDULE_BOOKING
+  REDEEM_PACKAGE
+  ADJUST_POINTS
+
+  @@map("audit_action")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Identity
+// ─────────────────────────────────────────────────────────────────────────
+
+/// A login-capable identity. OWNER/STAFF use email+password, CUSTOMER uses LINE
+/// Login, THERAPIST may or may not have login credentials (Phase 2 wires up NextAuth).
+model User {
+  id              String  @id @default(cuid())
+  role            Role
+  name            String
+  email           String? @unique
+  passwordHash    String? @map("password_hash")
+  phone           String? @unique
+  lineUserId      String? @unique @map("line_user_id")
+  lineDisplayName String? @map("line_display_name")
+  image           String?
+  isActive        Boolean @default(true) @map("is_active")
+
+  /// Only set for STAFF: which branch they operate. OWNER leaves this null (all-branch access).
+  branchId String? @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  therapist  Therapist?
+  membership Membership?
+
+  bookingsAsCustomer Booking[]     @relation("BookingCustomer")
+  bookingsCreated    Booking[]     @relation("BookingCreatedBy")
+  queuesAsCustomer   Queue[]       @relation("QueueCustomer")
+  transactionsSold   Transaction[] @relation("TransactionCashier")
+  packagesOwned      Package[]     @relation("PackageCustomer")
+  packagesSold       Package[]     @relation("PackageSoldBy")
+  auditLogs          AuditLog[]    @relation("AuditActor")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+/// A physical shop location. All operational data (bookings, queue, transactions) is scoped here.
+model Branch {
+  id        String  @id @default(cuid())
+  name      String
+  slug      String  @unique
+  address   String?
+  phone     String?
+  timezone  String  @default("Asia/Bangkok")
+  openTime  String  @default("10:00") @map("open_time")
+  closeTime String  @default("22:00") @map("close_time")
+  isActive  Boolean @default(true) @map("is_active")
+
+  users              User[]
+  therapists         Therapist[]
+  therapistSchedules TherapistSchedule[]
+  bookings           Booking[]
+  queues             Queue[]
+  transactions       Transaction[]
+  packages           Package[]
+  auditLogs          AuditLog[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("branches")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Catalog: services & therapists
+// ─────────────────────────────────────────────────────────────────────────
+
+/// A service catalog entry, e.g. "นวดไทย", "นวดน้ำมัน". Shared across branches.
+/// Duration + price live on ServiceOption (a service usually has a 60/90/120-minute tier each
+/// with its own price).
+model Service {
+  id          String  @id @default(cuid())
+  name        String
+  category    String?
+  description String?
+  imageUrl    String? @map("image_url")
+  isActive    Boolean @default(true) @map("is_active")
+
+  options            ServiceOption[]
+  therapistSpecialty TherapistService[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("services")
+}
+
+/// A sellable duration/price tier of a Service (e.g. นวดไทย 60 นาที ฿300).
+model ServiceOption {
+  id              String  @id @default(cuid())
+  serviceId       String  @map("service_id")
+  service         Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  durationMinutes Int     @map("duration_minutes")
+  price           Decimal @db.Decimal(10, 2)
+  isActive        Boolean @default(true) @map("is_active")
+
+  bookings         Booking[]
+  queues           Queue[]
+  transactionItems TransactionItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([serviceId, durationMinutes])
+  @@map("service_options")
+}
+
+/// A therapist profile. 1:1 with User (nullable — a therapist can exist before their login
+/// account is created). Single-branch by design for Phase 1 simplicity.
+model Therapist {
+  id     String  @id @default(cuid())
+  userId String? @unique @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  nickname String
+  bio      String?
+  status   TherapistStatus @default(ACTIVE)
+
+  /// Default commission applied when a TransactionItem doesn't override it (see TherapistService).
+  commissionType CommissionType @default(PERCENTAGE) @map("commission_type")
+  commissionRate Decimal        @map("commission_rate") @db.Decimal(10, 2)
+
+  ratingAverage Decimal @default(0) @map("rating_average") @db.Decimal(3, 2)
+  ratingCount   Int     @default(0) @map("rating_count")
+
+  hiredAt DateTime @default(now()) @map("hired_at")
+
+  specialties      TherapistService[]
+  schedules        TherapistSchedule[]
+  bookings         Booking[]
+  queues           Queue[]
+  transactionItems TransactionItem[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("therapists")
+}
+
+/// Which services a therapist is capable of performing, with an optional per-therapist
+/// commission override for that specific service.
+model TherapistService {
+  therapistId String    @map("therapist_id")
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  serviceId   String    @map("service_id")
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  commissionRateOverride Decimal? @map("commission_rate_override") @db.Decimal(10, 2)
+
+  @@id([therapistId, serviceId])
+  @@map("therapist_services")
+}
+
+/// One concrete work day for a therapist (not a recurring weekly template) — makes it simple to
+/// mark one-off leave/day-off and to compute available slots per date in Phase 3.
+model TherapistSchedule {
+  id          String    @id @default(cuid())
+  therapistId String    @map("therapist_id")
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  branchId    String    @map("branch_id")
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  date      DateTime       @db.Date
+  startTime String?        @map("start_time")
+  endTime   String?        @map("end_time")
+  status    ScheduleStatus @default(WORKING)
+  note      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([therapistId, date])
+  @@map("therapist_schedules")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Booking & queue
+// ─────────────────────────────────────────────────────────────────────────
+
+/// An advance reservation (made online, by phone, or by staff). `therapistId` is nullable to
+/// support "คนไหนก็ได้" (any therapist) bookings that get assigned later. Double-booking for a
+/// given therapist is blocked at the DB level — see prisma/migrations for the EXCLUDE constraint.
+model Booking {
+  id String @id @default(cuid())
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  customerId String? @map("customer_id")
+  customer   User?   @relation("BookingCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  guestName  String? @map("guest_name")
+  guestPhone String? @map("guest_phone")
+
+  serviceOptionId String        @map("service_option_id")
+  serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
+
+  therapistId String?    @map("therapist_id")
+  therapist   Therapist? @relation(fields: [therapistId], references: [id], onDelete: SetNull)
+
+  startTime DateTime      @map("start_time")
+  endTime   DateTime      @map("end_time")
+  status    BookingStatus @default(PENDING)
+  source    BookingSource @default(ONLINE)
+  notes     String?
+
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelReason String?   @map("cancel_reason")
+
+  /// Self-relation used when a booking is moved to a new time slot instead of cancelled outright.
+  rescheduledFromId String?  @unique @map("rescheduled_from_id")
+  rescheduledFrom   Booking? @relation("BookingReschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  rescheduledTo     Booking? @relation("BookingReschedule")
+
+  createdById String? @map("created_by_id")
+  createdBy   User?   @relation("BookingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  queue Queue?
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([branchId, startTime])
+  @@index([therapistId, startTime])
+  @@map("bookings")
+}
+
+/// The real-time operational queue for a single day at a branch. Created from a Booking when the
+/// customer checks in, or created directly for walk-ins with no prior Booking.
+model Queue {
+  id String @id @default(cuid())
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  bookingId String?  @unique @map("booking_id")
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  customerId String? @map("customer_id")
+  customer   User?   @relation("QueueCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  guestName  String? @map("guest_name")
+  guestPhone String? @map("guest_phone")
+
+  serviceOptionId String        @map("service_option_id")
+  serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
+
+  therapistId String?    @map("therapist_id")
+  therapist   Therapist? @relation(fields: [therapistId], references: [id], onDelete: SetNull)
+
+  /// Human-facing daily sequence number, e.g. "A014". Reset every day per branch.
+  queueNumber String      @map("queue_number")
+  bedLabel    String?     @map("bed_label")
+  status      QueueStatus @default(WAITING)
+
+  checkedInAt DateTime? @map("checked_in_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  transaction Transaction?
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([branchId, queueNumber, createdAt])
+  @@index([branchId, status])
+  @@map("queues")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// POS / payments
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One payment/receipt. Line items live in TransactionItem so a single checkout can cover
+/// multiple services (e.g. a couple booking, or add-on services).
+model Transaction {
+  id String @id @default(cuid())
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  queueId String? @unique @map("queue_id")
+  queue   Queue?  @relation(fields: [queueId], references: [id], onDelete: SetNull)
+
+  receiptNo String @unique @map("receipt_no")
+
+  cashierId String @map("cashier_id")
+  cashier   User   @relation("TransactionCashier", fields: [cashierId], references: [id], onDelete: Restrict)
+
+  subtotal       Decimal @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  /// VAT rate snapshotted at sale time (e.g. 7.00) so a future rate change never rewrites history.
+  vatRate        Decimal @default(7) @map("vat_rate") @db.Decimal(5, 2)
+  vatAmount      Decimal @map("vat_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(10, 2)
+
+  paymentMethod PaymentMethod     @map("payment_method")
+  status        TransactionStatus @default(PENDING)
+  paidAt        DateTime?         @map("paid_at")
+  voidedAt      DateTime?         @map("voided_at")
+  voidReason    String?           @map("void_reason")
+
+  items TransactionItem[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([branchId, createdAt])
+  @@map("transactions")
+}
+
+/// One line item of a Transaction. Price and therapist commission are both snapshotted here at
+/// sale time — never recompute historical payouts from the therapist's current rate.
+model TransactionItem {
+  id String @id @default(cuid())
+
+  transactionId String      @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  serviceOptionId String        @map("service_option_id")
+  serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
+
+  therapistId String?    @map("therapist_id")
+  therapist   Therapist? @relation(fields: [therapistId], references: [id], onDelete: SetNull)
+
+  quantity          Int     @default(1)
+  unitPriceSnapshot Decimal @map("unit_price_snapshot") @db.Decimal(10, 2)
+  lineTotal         Decimal @map("line_total") @db.Decimal(10, 2)
+
+  /// Snapshot of Therapist.commissionType/commissionRate (or the TherapistService override) at
+  /// the moment of sale — see hard rule #4.
+  commissionType   CommissionType? @map("commission_type")
+  commissionRate   Decimal?        @map("commission_rate") @db.Decimal(10, 2)
+  commissionAmount Decimal         @default(0) @map("commission_amount") @db.Decimal(10, 2)
+
+  /// Set when this line was paid for by redeeming a course credit instead of cash.
+  packageUsage PackageUsage?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("transaction_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Membership, packages & courses
+// ─────────────────────────────────────────────────────────────────────────
+
+/// CRM profile for a customer — loyalty points and tier. Kept separate from User so identity/auth
+/// concerns stay independent of loyalty-program state.
+model Membership {
+  id         String @id @default(cuid())
+  customerId String @unique @map("customer_id")
+  customer   User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  points   Int            @default(0)
+  tier     MembershipTier @default(STANDARD)
+  joinedAt DateTime       @default(now()) @map("joined_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("memberships")
+}
+
+/// A purchased course/package owned by a customer, e.g. "คอร์สนวดน้ำมัน 10 ครั้ง".
+/// `remainingSessions` is only ever decremented atomically together with a PackageUsage row
+/// written in the same DB transaction — see prisma/ER.md.
+model Package {
+  id String @id @default(cuid())
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  customerId String @map("customer_id")
+  customer   User   @relation("PackageCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+
+  /// Null = redeemable against any service; set = locked to one specific service.
+  serviceId String? @map("service_id")
+
+  name              String
+  totalSessions     Int           @map("total_sessions")
+  remainingSessions Int           @map("remaining_sessions")
+  pricePaid         Decimal       @map("price_paid") @db.Decimal(10, 2)
+  status            PackageStatus @default(ACTIVE)
+
+  purchasedAt DateTime  @default(now()) @map("purchased_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  soldById String @map("sold_by_id")
+  soldBy   User   @relation("PackageSoldBy", fields: [soldById], references: [id], onDelete: Restrict)
+
+  usages PackageUsage[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@map("packages")
+}
+
+/// Immutable ledger row: one redemption of one session from a Package. Never updated or deleted —
+/// corrections are made by adding a compensating entry, not by mutating history.
+model PackageUsage {
+  id String @id @default(cuid())
+
+  packageId String  @map("package_id")
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  transactionItemId String?          @unique @map("transaction_item_id")
+  transactionItem   TransactionItem? @relation(fields: [transactionItemId], references: [id], onDelete: SetNull)
+
+  sessionsUsed Int     @default(1) @map("sessions_used")
+  note         String?
+
+  usedAt DateTime @default(now()) @map("used_at")
+
+  @@map("package_usages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit log
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Append-only audit trail. Required for every financial transaction and every queue edit
+/// (hard rule #3). Application code must never UPDATE or DELETE a row here.
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorId   String? @map("actor_id")
+  actor     User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  /// Snapshot of the actor's role at the time of the action (roles can change later).
+  actorRole Role?   @map("actor_role")
+
+  branchId String? @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String      @map("entity_id")
+
+  beforeData Json? @map("before_data")
+  afterData  Json? @map("after_data")
+  metadata   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([branchId, createdAt])
+  @@map("audit_logs")
+}
