@@ -1,0 +1,20 @@
+name: Booking reminder cron
+
+# Vercel Hobby's Cron only supports a minimum interval of once per day, too coarse for a
+# "remind ~30 minutes before your appointment" notification. GitHub Actions' scheduled
+# workflows have no such limit, so this drives that endpoint instead — free, and doesn't
+# require the paid Vercel plan just for a second cron job.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  trigger-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reminder endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/reminders"

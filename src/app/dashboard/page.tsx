@@ -87,7 +87,7 @@ export default async function DashboardPage({
         <SignOutButton />
       </header>
 
-      <nav className="flex gap-2 text-sm">
+      <nav className="flex flex-wrap gap-2 text-sm">
         <Link href="/dashboard/pos" className="rounded-lg border border-neutral-300 px-3 py-1.5">
           POS / ชำระเงิน
         </Link>

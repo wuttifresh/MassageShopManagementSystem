@@ -30,12 +30,18 @@ export async function getSalesReport({
   startDate,
   endDate,
 }: {
-  branchId: string;
+  /// Omit to aggregate across every branch (used by the Phase 9 daily summary).
+  branchId?: string;
   startDate: Date;
   endDate: Date;
 }): Promise<SalesReport> {
   const transactions = await prisma.transaction.findMany({
-    where: { branchId, status: "PAID", deletedAt: null, createdAt: { gte: startDate, lt: endDate } },
+    where: {
+      ...(branchId ? { branchId } : {}),
+      status: "PAID",
+      deletedAt: null,
+      createdAt: { gte: startDate, lt: endDate },
+    },
     include: {
       items: { include: { serviceOption: { include: { service: true } }, therapist: true } },
     },

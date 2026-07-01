@@ -2,7 +2,7 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 8 — รายงาน & Multi-branch** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 9 — แจ้งเตือน & Polish** เสร็จแล้ว (ครบทุก Phase)
 
 ## Tech Stack
 
@@ -122,6 +122,33 @@ npm run build        # production build
   `callbackUrl` อีกต่อไป (`/login` จะไปหน้า home ตาม role เสมอ), เพิ่ม `ROLE_HOME` ใน `middleware.ts` ให้ role
   ผิดแต่ login แล้วไปหน้า home ของตัวเองตรงๆ ไม่ผ่าน `/login`, และรวม logic ตรวจ OWNER ที่หน้า page-level ไว้ที่
   `src/lib/require-owner-page.ts` ดูรายละเอียดเต็มใน `prisma/ER.md` หัวข้อ "Phase 8 — รายงาน & Multi-branch"
+
+## แจ้งเตือน & Polish (Phase 9)
+
+- **LINE notifications** ผ่าน LINE Messaging API push message (`src/lib/line-messaging.ts`) —
+  LINE Notify ถูกปิดให้บริการไปแล้วตั้งแต่มีนาคม 2025 จึงต้องใช้ Messaging API แทน ต้องสร้าง channel
+  แยกจาก LINE Login (คนละ token) ดู `.env.example`/`DEPLOYMENT.md` ไม่ตั้งค่าไว้จะแค่ log ขึ้น console
+  แทนการส่งจริง (ไม่ทำให้ flow การจอง/เช็คเอาท์พังถ้า LINE ล่ม)
+  - ยืนยันจองสำเร็จ — ส่งทันทีใน `createBooking` (`src/app/book/actions.ts`) ถ้าลูกค้ามี `lineUserId`
+  - เตือนก่อนถึงคิว — cron `/api/cron/reminders` เช็คการจองที่ยืนยันแล้วซึ่งจะถึงเวลาภายใน 30 นาที
+    ยังไม่เคยเตือน (`Booking.reminderSentAt`) แล้วส่ง + mark ว่าส่งแล้วกันส่งซ้ำ
+  - สรุปยอดสิ้นวันให้เจ้าของ — cron `/api/cron/daily-summary` ส่งสรุปยอดขายวันนี้ (รวม + แยกตามสาขา)
+    ให้ทุก user role OWNER ที่มี `lineUserId`
+- **Cron**: `vercel.json` ตั้ง daily-summary ให้รันวันละครั้ง (Vercel Hobby รองรับแค่นี้) ส่วน
+  reminders ต้องรันถี่กว่านั้นมาก จึงใช้ `.github/workflows/reminders.yml` (GitHub Actions ฟรี รันทุก
+  10 นาที) แทน ทั้งสอง endpoint เช็ค `Authorization: Bearer $CRON_SECRET` (`src/lib/cron-auth.ts`)
+  ก่อนทำงานเสมอ
+  - **เจอบั๊กระหว่างทดสอบ**: ทั้งสอง route ถูก Next.js มองว่าเป็น static route (ไม่มี dynamic API
+    เรียกใช้ตรงๆ) แล้ว prerender ไว้ตอน build เพียงครั้งเดียว — ถ้าไม่แก้ cron จะได้ response เดิมซ้ำ
+    ทุกครั้งไม่ว่าจะเรียกกี่โมง ไม่สะท้อนเวลา/ข้อมูลจริงเลย เห็นได้จาก `npm run build` ที่ list ทั้งคู่
+    เป็น `○ (Static)` แก้ด้วย `export const dynamic = "force-dynamic"` ในทั้งสอง route (ตรวจซ้ำแล้วว่า
+    build ออกมาเป็น `ƒ (Dynamic)` ถูกต้อง)
+- **Error/loading/responsive polish**: เพิ่ม `src/app/error.tsx`/`not-found.tsx` (Thai copy) +
+  `loading.tsx` skeleton ที่ `/dashboard`, `/book`, `/account`, `/therapist` ทดสอบ responsive จริง
+  ด้วย Playwright ที่ mobile viewport (375px) — **เจอ bug จริง**: nav links บนหน้า `/dashboard` ใช้
+  `flex` ไม่มี `flex-wrap` พอมีลิงก์ 7 อัน (เพิ่มมาจาก Phase 8) ล้นจอ mobile แก้แล้ว
+- **`DEPLOYMENT.md`** — คู่มือ deploy Vercel + Supabase ครบ (LINE channel setup, cron setup,
+  production checklist)
 
 ## Hard rules (บังคับทุก Phase)
 

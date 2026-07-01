@@ -452,3 +452,70 @@ code เดี่ยวๆ ด้วย curl
 ทดสอบซ้ำหลังแก้ด้วย Playwright: STAFF เปิด `/dashboard/branches` และ `/dashboard/staff` แล้ว
 landing ที่ `/dashboard` (ไม่ loop), OWNER สร้างสาขาใหม่ + สร้างพนักงานใหม่ผูกกับสาขานั้นสำเร็จ
 ครบ flow ตรวจสอบข้อมูลใน DB ตรงกับที่คาดไว้ พร้อม `AuditLog` ครบทั้งสอง action
+
+## Phase 9 — แจ้งเตือน & Polish
+
+**LINE Notify ถูกปิดให้บริการไปแล้ว**: สเปกเดิมเขียนว่า "LINE OA/Notify" แต่ LINE Notify ถูกยกเลิก
+บริการไปตั้งแต่มีนาคม 2025 (ก่อนวันที่ปัจจุบันของ session นี้มาก) เฟสนี้จึงใช้ **LINE Messaging API**
+(push message endpoint) แทน ซึ่งต้องสร้าง channel แยกจาก "LINE Login" channel ที่ใช้ตั้งแต่ Phase 2
+(คนละ credential — channel access token ไม่ใช่ client secret) แต่ยังใช้ `User.lineUserId` เดิมที่มีอยู่
+แล้วในสคีมาตั้งแต่ Phase 1 ได้เลย ไม่ต้องเพิ่มฟิลด์ใหม่
+
+**`src/lib/line-messaging.ts`** — `sendLineMessage(lineUserId, text)` เดียวที่ทุกจุดแจ้งเตือนเรียกใช้
+ไม่ throw เด็ดขาด (แค่ log แล้ว return) ทั้งตอนไม่ได้ตั้งค่า `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`
+และตอน LINE API เรียกไม่สำเร็จ — เพราะการแจ้งเตือนเป็นแค่ best-effort ไม่ใช่ core logic ของการจอง/
+เช็คเอาท์ ถ้าปล่อยให้ throw จะทำให้ธุรกรรมจริงพังไปด้วยทั้งที่ไม่เกี่ยวกัน (pattern เดียวกับ Supabase
+Realtime graceful fallback ใน Phase 4)
+
+**สามจุดที่ส่งแจ้งเตือนจริง**:
+1. **ยืนยันจอง** — ต่อท้าย `createBooking` (`src/app/book/actions.ts`) หลัง transaction commit
+   สำเร็จ ดึง `lineUserId` ของลูกค้าจาก DB แยกต่างหาก (ไม่ได้เก็บใน NextAuth session/JWT เพราะไม่อยาก
+   ขยาย session payload/type augmentation เพิ่มสำหรับข้อมูลที่ใช้แค่จุดเดียว)
+2. **เตือนก่อนถึงคิว** — ตีความ "ก่อนถึงคิว" เป็น "ก่อนถึงเวลานัดที่จองไว้" (ไม่ใช่ตำแหน่งคิวที่หน้าร้าน
+   เพราะระบบเช็คอินคิวเป็นแบบ staff เช็คอินให้หน้าร้านเท่านั้น ไม่มี remote check-in ที่จะรู้ตำแหน่งคิว
+   ล่วงหน้าได้) `/api/cron/reminders` หา booking ที่ `CONFIRMED`, ยังไม่ถูกลบ, `reminderSentAt` เป็น
+   null, `startTime` อยู่ในอีก 30 นาทีข้างหน้า แล้วส่ง + set `reminderSentAt` (เพิ่มฟิลด์ใหม่ในสคีมา,
+   migration `20260701101450_add_booking_reminder_sent_at`) กัน cron รันซ้อนกันแล้วส่งซ้ำ
+3. **สรุปยอดสิ้นวันให้เจ้าของ** — `/api/cron/daily-summary` เรียก `getSalesReport` (Phase 8) ทั้งแบบ
+   รวมทุกสาขา (`branchId` เดิมเป็น required เปลี่ยนเป็น optional เพื่อรองรับโหมดนี้โดยเฉพาะ ไม่กระทบ
+   หน้ารายงานเดิมเพราะ caller เดิมยังส่ง `branchId` เสมอ) และแยกต่อสาขา ส่งให้ทุก `User` ที่
+   `role: OWNER` และมี `lineUserId` ตั้งไว้ — OWNER ที่ login ด้วย email/password (ไม่ใช่ LINE Login)
+   ต้องผูก `lineUserId` เข้าบัญชีเองด้วยมือถ้าอยากรับสรุปยอด (ไม่มี UI ให้ผูกในเฟสนี้ เกินขอบเขตที่ขอ)
+
+**Cron — ข้อจำกัดจริงของ Vercel Hobby ที่ต้องออกแบบรอบข้าง**: Vercel Cron บน Hobby plan รันได้
+ต่ำสุดแค่วันละครั้ง เหมาะกับ daily-summary พอดี (`vercel.json`, `30 15 * * *` UTC = 22:30 ไทย) แต่ไม่
+พอสำหรับ reminders ที่ต้องเช็คถี่กว่านั้นมาก (ทุก ~10 นาที) การจะได้ cron ถี่กว่านี้ต้อง upgrade เป็น
+Pro ($20/เดือน) ซึ่งเกินงบเป้าหมาย ~$2-4 USD/เดือนของโปรเจกต์ไปมาก จึงใช้
+**GitHub Actions scheduled workflow** (`.github/workflows/reminders.yml`, `cron: "*/10 * * * *"`)
+เรียก endpoint แทน — ฟรี ไม่มีข้อจำกัดความถี่แบบเดียวกัน ทั้งสอง endpoint เช็ค
+`Authorization: Bearer $CRON_SECRET` ก่อนทำงานเสมอ (`src/lib/cron-auth.ts`) — Vercel เติม header นี้
+ให้เองอัตโนมัติถ้าตั้งชื่อ env var ตรงกับ `CRON_SECRET` พอดี, ฝั่ง GitHub Actions ส่ง header เดียวกัน
+ด้วยมือผ่าน repo secret ถ้าไม่ตั้ง `CRON_SECRET` เลย (local dev) จะข้ามการเช็ค เพื่อให้ `curl
+localhost:3000/...` ใช้งานได้โดยไม่ต้องตั้งค่าเพิ่ม — ห้ามเป็นแบบนี้ใน production เด็ดขาด
+
+**เจอ bug จริงระหว่างทดสอบด้วย `npm run build`**: ทั้งสอง cron route ถูก Next.js วิเคราะห์ว่าเป็น
+static route handler (ไม่มีการเรียก dynamic API อย่าง `cookies()`/`headers()` ตรงๆ ในโค้ด แค่รับ
+`NextRequest` เป็นพารามิเตอร์เฉยๆ ไม่นับ) แล้ว **prerender ไว้ครั้งเดียวตอน build** เห็นชัดจาก build
+output ที่ list ทั้งคู่เป็น `○ (Static)` — ถ้าปล่อยแบบนี้ไปจริง production จะได้ response เดิมที่ bake
+ไว้ตอน build ซ้ำทุกครั้งที่เรียก ไม่เช็คเวลา/DB จริงเลยแม้แต่ครั้งเดียวหลัง deploy (bug ร้ายแรงที่มองจาก
+`curl` ตอน dev ไม่เห็นเลย เพราะ dev mode ไม่ prerender แบบเดียวกับ production build) แก้ด้วยการเพิ่ม
+`export const dynamic = "force-dynamic"` ในทั้งสอง route แล้วรัน `npm run build` ซ้ำยืนยันว่า list
+เป็น `ƒ (Dynamic)` ถูกต้องแล้ว
+
+**Error/loading/responsive polish**: เพิ่ม `src/app/error.tsx` (client component, ตาม Next.js App
+Router convention ที่ error boundary ต้องเป็น client), `src/app/not-found.tsx`, และ `loading.tsx`
+skeleton ที่ทางเข้าหลักของแต่ละ role (`/dashboard`, `/book`, `/account`, `/therapist`) — เพราะ
+`loading.tsx` ที่ segment ไหนจะครอบคลุม nested route ทั้งหมดที่ยังไม่มี `loading.tsx` ของตัวเองด้วย
+(เช่น `/dashboard/loading.tsx` ครอบคลุม `/dashboard/branches`, `/dashboard/reports` ฯลฯ ทั้งหมด)
+
+ทดสอบ responsive จริงด้วย Playwright ที่ mobile viewport 375px ทุกหน้าหลักของทุก role — **เจอ bug
+จริง**: `/dashboard` มี nav links 7 อัน (เพิ่มมาเรื่อยๆ ตั้งแต่ Phase 6-8) อยู่ใน `<nav className="flex
+gap-2">` ที่ไม่มี `flex-wrap` พอมีลิงก์เยอะขึ้นจน "จัดการสาขา"/"พนักงาน" (Phase 8) ทำให้แถวยาวเกินจอ
+mobile 375px เกิด horizontal overflow (`scrollWidth=513` vs `clientWidth=375`) แก้ด้วยการเพิ่ม
+`flex-wrap` เข้าไปจุดเดียว ทดสอบซ้ำแล้วว่าไม่มีหน้าไหน overflow อีก (`scrollWidth === clientWidth`
+ทุกหน้าที่เช็ค: `/book`, `/account`, `/dashboard` และทุกหน้าย่อย, `/therapist`, 404)
+
+**`DEPLOYMENT.md`** (ใหม่) — คู่มือ deploy Vercel + Supabase แบบ step-by-step ครบ: ตั้งค่า Supabase
+project + connection strings, สร้าง LINE channels ทั้งสองแบบ, ตั้งค่า env vars บน Vercel, ตั้งค่า
+cron ทั้งสองแบบ (Vercel Cron + GitHub Actions), และ production checklist (backup, secret rotation,
+pooled connection, ฯลฯ)

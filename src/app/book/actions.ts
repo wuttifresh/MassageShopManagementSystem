@@ -4,8 +4,17 @@ import { revalidatePath } from "next/cache";
 import { isDriverAdapterError } from "@prisma/driver-adapter-utils";
 import { BookingSource, BookingStatus, Role } from "@/generated/prisma/client";
 import { findAvailableTherapist } from "@/lib/availability";
+import { sendLineMessage } from "@/lib/line-messaging";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
+
+function formatThaiDateTime(date: Date): string {
+  return date.toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 export type CreateBookingInput = {
   branchId: string;
@@ -35,9 +44,15 @@ export async function createBooking(input: CreateBookingInput): Promise<CreateBo
 
   const serviceOption = await prisma.serviceOption.findUnique({
     where: { id: input.serviceOptionId, isActive: true },
+    include: { service: true },
   });
   if (!serviceOption) {
     return { success: false, error: "ไม่พบบริการที่เลือก" };
+  }
+
+  const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+  if (!branch) {
+    return { success: false, error: "ไม่พบสาขาที่เลือก" };
   }
 
   const startTime = combine(input.date, input.time);
@@ -99,6 +114,17 @@ export async function createBooking(input: CreateBookingInput): Promise<CreateBo
 
       return created;
     });
+
+    const customer = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { lineUserId: true },
+    });
+    if (customer?.lineUserId) {
+      await sendLineMessage(
+        customer.lineUserId,
+        `ยืนยันการจองสำเร็จ ✅\nบริการ: ${serviceOption.service.name} (${serviceOption.durationMinutes} นาที)\nสาขา: ${branch.name}\nวันเวลา: ${formatThaiDateTime(startTime)}`
+      );
+    }
 
     revalidatePath("/account");
     return { success: true, bookingId: booking.id };
