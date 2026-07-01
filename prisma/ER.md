@@ -167,3 +167,37 @@ Constraint นี้ทำให้ธอมนวดคนเดียวกั
 npx prisma migrate deploy   # apply migrations ทั้งหมดแบบ production-safe
 npm run db:seed             # ใส่ seed data ตัวอย่าง (ปรับ/ลบตามจริงก่อนใช้งานจริง)
 ```
+
+## Phase 2 — Auth & Roles
+
+ใช้ **NextAuth v4** (`next-auth@4`, เสถียรและรองรับ Next.js 14 App Router ชัดเจนกว่า v5 ที่ยังเป็น
+beta) session แบบ **JWT** (ไม่ใช้ database session) — ตัดสินใจ **ไม่เพิ่มตาราง** `Account` /
+`Session` / `VerificationToken` ของ NextAuth Prisma Adapter เข้า schema เพราะ:
+
+- Credentials provider (email+password) ของ NextAuth ใช้ร่วมกับ database adapter ไม่ได้อยู่แล้ว
+  (ต้องใช้ JWT strategy เท่านั้น) — ทำให้การมีสองแบบผสมกันไม่มีประโยชน์
+- โมเดล `User` ใน Phase 1 มีฟิลด์ที่จำเป็นครบอยู่แล้ว (`email`, `passwordHash`, `lineUserId`) จึงผูก
+  ตรงกับ NextAuth ได้โดยไม่ต้องมีตารางกลางเพิ่ม ลด surface area ของ schema ตรงตามหลัก
+  "ไม่เพิ่ม abstraction เกินความจำเป็น"
+- Session แบบ JWT ไม่ต้อง query DB ทุก request → เหมาะกับงบ serverless ~$2-4 USD/เดือน
+
+**Provider ที่ใช้:**
+
+- `CredentialsProvider` (id `credentials`) — สำหรับ `OWNER` / `STAFF` / `THERAPIST` เท่านั้น
+  (ตรวจ role ใน `authorize()`) เทียบรหัสผ่านด้วย `bcryptjs` กับ `User.passwordHash`
+- `LineProvider` — สำหรับ `CUSTOMER` เท่านั้น ใน `signIn` callback จะ find-or-create แถว `User`
+  (role `CUSTOMER`) จาก `lineUserId` พร้อมสร้าง `Membership` ให้อัตโนมัติถ้ายังไม่มี
+
+**Middleware** (`src/middleware.ts`) ป้องกัน 3 กลุ่ม route ด้วย `next-auth/middleware`:
+`/dashboard/**` (OWNER/STAFF), `/therapist/**` (THERAPIST), `/account/**` (CUSTOMER) — role ไหน
+เข้าโซนที่ไม่ใช่ของตัวเองจะถูก redirect ไป `/login` ทดสอบแล้วด้วย curl จริง (ดู PR) ครอบคลุม: ไม่ login
+→ redirect, login ผิด role → redirect, login ถูก role → 200, รหัสผ่านผิด → 401
+
+**ข้อจำกัดที่รู้ตัว (ยอมรับได้ใน Phase 2, ไม่ over-engineer ตอนนี้):** เพราะเป็น JWT session
+การ deactivate (`isActive=false`) หรือเปลี่ยน role ของ user จะไม่มีผลจนกว่า token จะหมดอายุ/มีการ
+login ใหม่ (default 30 วัน) — ถ้าต้องการ revoke ทันที ค่อยเพิ่ม mechanism (เช่น เช็ค `isActive`
+ใน middleware ทุก request หรือย่อ token maxAge) ในเฟสที่เกี่ยวข้องกับความปลอดภัยจริงจังขึ้น
+
+**Demo credentials** (จาก `prisma/seed.ts`, ใช้ทดสอบเท่านั้น ห้ามใช้ค่านี้ใน production):
+`owner@massageshop.test` / `staff@massageshop.test` / `nok@massageshop.test` /
+`waew@massageshop.test` / `oi@massageshop.test` — รหัสผ่านเดียวกันหมด `Password123!`
