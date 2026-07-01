@@ -2,7 +2,7 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 3 — ระบบจองคิว (Customer)** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 4 — ระบบจัดการคิว (Admin)** เสร็จแล้ว
 
 ## Tech Stack
 
@@ -63,6 +63,16 @@ npm run build        # production build
 - กัน double-booking สองชั้น: เช็ค availability ในแอปก่อน (UX) + PostgreSQL `EXCLUDE` constraint
   เป็นด่านสุดท้ายที่ระดับ DB (ทดสอบจริงด้วย concurrent request แล้ว) ดูรายละเอียดใน `prisma/ER.md`
   หัวข้อ "Phase 3 — ระบบจองคิว (Customer)"
+
+## ระบบจัดการคิว - Admin (Phase 4)
+
+- `/dashboard` — เช็คอินจากการจอง, เพิ่มคิว walk-in, มอบหมายหมอนวด, เปลี่ยนสถานะคิว
+  (รอ → มอบหมายแล้ว → กำลังนวด → เสร็จ), ระบุเตียง, ยกเลิกคิว (OWNER เห็นทุกสาขา, STAFF เฉพาะสาขาตัวเอง)
+- `src/lib/queue.ts` / `src/app/dashboard/actions.ts` — logic คิวรายวันและ server actions ทั้งหมด
+  (ทุก action เขียน `AuditLog`)
+- `src/app/dashboard/queue-realtime-listener.tsx` — Supabase Realtime (no-op ถ้าไม่ได้ตั้งค่า
+  `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`) ต้องรัน `alter publication supabase_realtime add table queues;`
+  บน Supabase project จริงด้วย ดูรายละเอียดใน `prisma/ER.md` หัวข้อ "Phase 4 — ระบบจัดการคิว (Admin)"
 
 ## Hard rules (บังคับทุก Phase)
 
