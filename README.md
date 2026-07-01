@@ -149,6 +149,9 @@ npm run build        # production build
   `flex` ไม่มี `flex-wrap` พอมีลิงก์ 7 อัน (เพิ่มมาจาก Phase 8) ล้นจอ mobile แก้แล้ว
 - **`DEPLOYMENT.md`** — คู่มือ deploy Vercel + Supabase ครบ (LINE channel setup, cron setup,
   production checklist)
+- **`supabase/deploy.sql`** — รวม migration ทั้งหมดเป็นไฟล์เดียว วางใน Supabase SQL Editor รันได้เลย
+  โดยไม่ต้องมี Node/Prisma CLI (generate จาก `npm run db:build-sql` → `scripts/build-supabase-sql.mjs`
+  ต้องรันคำสั่งนี้ใหม่ทุกครั้งที่เพิ่ม migration ใหม่ ไฟล์นี้ไม่ auto-sync)
 
 ## Hard rules (บังคับทุก Phase)
 
