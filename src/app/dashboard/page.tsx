@@ -88,6 +88,9 @@ export default async function DashboardPage({
       </header>
 
       <nav className="flex gap-2 text-sm">
+        <Link href="/dashboard/pos" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+          POS / ชำระเงิน
+        </Link>
         <Link href="/dashboard/therapists" className="rounded-lg border border-neutral-300 px-3 py-1.5">
           จัดการหมอนวด
         </Link>

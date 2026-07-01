@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type Branch = { id: string; name: string };
 
@@ -12,11 +12,12 @@ export function BranchSwitcher({
   activeBranchId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   return (
     <select
       value={activeBranchId}
-      onChange={(e) => router.push(`/dashboard?branchId=${e.target.value}`)}
+      onChange={(e) => router.push(`${pathname}?branchId=${e.target.value}`)}
       className="rounded-lg border border-neutral-300 p-2 text-sm"
     >
       {branches.map((b) => (

@@ -312,3 +312,38 @@ Phase 1 แทน สอดคล้องกับ hard rule #2 และป้
 **ตารางเวร** (`/dashboard/therapists/[id]/schedule`) แสดง 14 วันข้างหน้า แต่ละวัน save แยกเป็น
 แถวอิสระ (ไม่ต้อง submit ทีเดียวทั้งหมด) upsert ลง `TherapistSchedule` ตรงๆ ตาม unique constraint
 `(therapistId, date)` ที่มีอยู่แล้วตั้งแต่ Phase 1
+
+## Phase 6 — POS & ชำระเงิน
+
+**Flow หลัก**: Phase 4 ทำให้ `Queue` จบงานเป็น `DONE`, Phase 6 มา "ชำระเงิน" ให้คิวนั้น — หน้า
+`/dashboard/pos` แสดงรายการคิว `DONE` ที่ยังไม่มี `Transaction` ผูกอยู่ (`transaction: null` — ใช้
+ความสัมพันธ์ 1:1 optional ที่ออกแบบไว้ตั้งแต่ Phase 1) กด "ชำระเงิน" ไปที่
+`/dashboard/pos/new?queueId=X` ซึ่ง pre-fill รายการแรกจากบริการ/หมอนวดของคิวนั้น แคชเชียร์เพิ่ม
+รายการอื่นได้ (เช่น ขายเพิ่ม/แถม) ก่อนกดรับชำระ **กันจ่ายซ้ำ**: `Transaction.queueId` เป็น
+`@unique` อยู่แล้ว + เช็คซ้ำใน action ก่อน insert ด้วย (ทดสอบแล้วว่าเปิดหน้าชำระเงินซ้ำสำหรับคิว
+ที่จ่ายไปแล้วจะ redirect ไปใบเสร็จเดิมแทนที่จะให้จ่ายซ้ำ)
+
+**ห้ามเชื่อราคาจาก client เด็ดขาด**: ฝั่ง client คำนวณ subtotal/VAT/total แค่เพื่อแสดงผลแบบ
+real-time เท่านั้น — ตอน submit จริง server action (`createTransaction`) ดึงราคาปัจจุบัน
+(`ServiceOption.promoPrice ?? price`) จาก DB ใหม่ทุกครั้งด้วยตัวเอง ไม่ใช้ตัวเลขที่ client ส่งมาเลย
+ป้องกันการปลอมแปลงราคาผ่าน devtools/network request
+
+**ค่ามือหมอนวด** (`src/lib/commission.ts`): resolve `commissionType`/`commissionRate` จาก
+`Therapist` เป็นค่าเริ่มต้น แต่เช็ค `TherapistService.commissionRateOverride` ก่อนเสมอ (ถ้ามี
+override เฉพาะบริการนั้นจะใช้ค่านั้นแทน) คำนวณ `commissionAmount` แล้ว snapshot ทั้งสามค่าลง
+`TransactionItem` ทันที (hard rule #4) — ถ้าค่ามือของหมอนวดถูกแก้ในอนาคต (ผ่าน Phase 5) จะไม่กระทบ
+ยอดค่ามือของรายการที่ขายไปแล้วเลย (ทดสอบแล้วว่าตัวเลขที่บันทึกตรงกับสูตรจริง)
+
+**VAT แบบรวมในราคาอยู่แล้ว (VAT-inclusive)**: ราคาที่ลูกค้าเห็นตอนจอง (`/book`) เป็นราคาสุทธิ
+ราคาเดียว ไม่มี "+VAT" โผล่มาทีหลังตอนจ่ายเงินจริง ดังนั้น `totalAmount = subtotal - discount`
+(ไม่บวก VAT เพิ่ม) ส่วน `vatAmount` เป็นแค่ตัวเลข breakdown ที่แยกออกมาโชว์บนใบเสร็จเพื่อความถูกต้อง
+ทางบัญชี คำนวณจาก `totalAmount * 7 / 107` — เป็นข้อสมมติฐานที่ตัดสินใจแทนเพราะเครื่องมือถามคำถาม
+ไม่เสถียร ถ้าร้านจริงต้องการ VAT แบบบวกเพิ่มจากราคาที่ตั้งไว้ (exclusive) ต้องปรับสูตรใน
+`src/app/dashboard/pos/actions.ts` (`computeVat`) จุดเดียว
+
+**ยกเลิกใบเสร็จ (void) ไม่ใช่ hard delete**: `Transaction.status` เปลี่ยนเป็น `VOIDED` +
+`voidReason` + `voidedAt` เท่านั้น แถวและ `TransactionItem` ทั้งหมดยังอยู่ครบสำหรับตรวจสอบย้อนหลัง
+(hard rule #2) ไม่มีปุ่ม "ลบ" ใบเสร็จเลยในทุกกรณี — OWNER/STAFF ยกเลิกได้เท่ากัน (เหตุผลเดียวกับ
+Phase 5: ไม่อยากเพิ่ม permission tier ใหม่ที่ไม่มีที่ไหนในระบบใช้อยู่ก่อน) แต่ทุกครั้งที่ยกเลิก
+จะบันทึก `actorId`/`actorRole` ไว้ใน `AuditLog` เสมอ ซึ่งเป็นกลไก accountability จริงที่ hard
+rule ต้องการ ไม่ใช่การจำกัด role
