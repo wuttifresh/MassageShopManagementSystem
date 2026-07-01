@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:build-sql": "node scripts/build-supabase-sql.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
