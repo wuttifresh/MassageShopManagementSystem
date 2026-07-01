@@ -1,21 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { BookingStatus, QueueStatus, Role } from "@/generated/prisma/client";
+import { BookingStatus, QueueStatus } from "@/generated/prisma/client";
 import { generateQueueNumber, isTherapistBusy } from "@/lib/queue";
 import { prisma } from "@/lib/prisma";
-import { getCurrentSession } from "@/lib/session";
+import { requireStaffSession } from "@/lib/staff-auth";
 
 type ActionResult<T = undefined> = { success: true; data: T } | { success: false; error: string };
-
-/// OWNER can act on any branch; STAFF is scoped to the single branch they're assigned to.
-async function requireStaffSession(branchId: string) {
-  const session = await getCurrentSession();
-  if (!session?.user) return null;
-  if (session.user.role !== Role.OWNER && session.user.role !== Role.STAFF) return null;
-  if (session.user.role === Role.STAFF && session.user.branchId !== branchId) return null;
-  return session;
-}
 
 export async function checkInBooking(bookingId: string): Promise<ActionResult<{ queueId: string }>> {
   const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { queue: true } });

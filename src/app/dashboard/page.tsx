@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { endOfToday, isTherapistBusy, startOfToday } from "@/lib/queue";
+import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { SignOutButton } from "@/components/sign-out-button";
 import { QueueRealtimeListener } from "./queue-realtime-listener";
 import { CheckInButton } from "./check-in-button";
@@ -24,10 +26,7 @@ export default async function DashboardPage({
     orderBy: { name: "asc" },
   });
 
-  const activeBranchId =
-    session.user.role === "STAFF"
-      ? session.user.branchId
-      : (searchParams.branchId ?? branches[0]?.id ?? null);
+  const activeBranchId = await resolveActiveBranchId(session.user, searchParams.branchId);
 
   if (!activeBranchId) {
     return (
@@ -87,6 +86,15 @@ export default async function DashboardPage({
         </div>
         <SignOutButton />
       </header>
+
+      <nav className="flex gap-2 text-sm">
+        <Link href="/dashboard/therapists" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+          จัดการหมอนวด
+        </Link>
+        <Link href="/dashboard/services" className="rounded-lg border border-neutral-300 px-3 py-1.5">
+          จัดการบริการ
+        </Link>
+      </nav>
 
       {session.user.role === "OWNER" && (
         <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />

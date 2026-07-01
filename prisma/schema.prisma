@@ -235,12 +235,16 @@ model Service {
 
 /// A sellable duration/price tier of a Service (e.g. นวดไทย 60 นาที ฿300).
 model ServiceOption {
-  id              String  @id @default(cuid())
-  serviceId       String  @map("service_id")
-  service         Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  durationMinutes Int     @map("duration_minutes")
-  price           Decimal @db.Decimal(10, 2)
-  isActive        Boolean @default(true) @map("is_active")
+  id              String   @id @default(cuid())
+  serviceId       String   @map("service_id")
+  service         Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  durationMinutes Int      @map("duration_minutes")
+  price           Decimal  @db.Decimal(10, 2)
+  /// Promotional price shown/charged instead of `price` while set. Null = no active promotion.
+  /// Kept as a simple override rather than a separate Promotion model — no scheduling, no
+  /// per-customer targeting, just "the current selling price is X instead of Y".
+  promoPrice      Decimal? @map("promo_price") @db.Decimal(10, 2)
+  isActive        Boolean  @default(true) @map("is_active")
 
   bookings         Booking[]
   queues           Queue[]

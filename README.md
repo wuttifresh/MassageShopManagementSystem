@@ -2,7 +2,7 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 4 — ระบบจัดการคิว (Admin)** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 5 — จัดการหมอนวด & บริการ** เสร็จแล้ว
 
 ## Tech Stack
 
@@ -73,6 +73,15 @@ npm run build        # production build
 - `src/app/dashboard/queue-realtime-listener.tsx` — Supabase Realtime (no-op ถ้าไม่ได้ตั้งค่า
   `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`) ต้องรัน `alter publication supabase_realtime add table queues;`
   บน Supabase project จริงด้วย ดูรายละเอียดใน `prisma/ER.md` หัวข้อ "Phase 4 — ระบบจัดการคิว (Admin)"
+
+## จัดการหมอนวด & บริการ (Phase 5)
+
+- `/dashboard/therapists` — list/สร้าง/แก้ไขหมอนวด (ชื่อเล่น, ค่ามือ, ความถนัด, สถานะ), ลิงก์ไป
+  `/dashboard/therapists/[id]/schedule` จัดการตารางเวร 14 วันข้างหน้า (ทำงาน/วันหยุด/ลา)
+- `/dashboard/services` — list/สร้าง/แก้ไขบริการ + ตัวเลือกระยะเวลา/ราคา/ราคาโปรโมชั่น
+  (`ServiceOption.promoPrice`)
+- ไม่มีปุ่ม "ลบ" จริง — "ลบ" หมอนวด/บริการทำผ่านการปิดใช้งาน (`status`/`isActive`) เท่านั้น
+  ดูเหตุผลและรายละเอียดเพิ่มเติมใน `prisma/ER.md` หัวข้อ "Phase 5 — จัดการหมอนวด & บริการ"
 
 ## Hard rules (บังคับทุก Phase)
 

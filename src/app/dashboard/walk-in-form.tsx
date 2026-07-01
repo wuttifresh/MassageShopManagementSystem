@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { addWalkInQueue } from "./actions";
 
-type ServiceOption = { id: string; durationMinutes: number; price: string };
+type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string };
 
@@ -113,7 +113,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
           <option value="">เลือกระยะเวลา</option>
           {selectedService.options.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.durationMinutes} นาที (฿{o.price})
+              {o.durationMinutes} นาที ({o.promoPrice ? `฿${o.promoPrice} ปกติ ฿${o.price}` : `฿${o.price}`})
             </option>
           ))}
         </select>

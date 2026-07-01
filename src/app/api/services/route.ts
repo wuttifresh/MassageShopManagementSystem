@@ -15,7 +15,7 @@ export async function GET() {
       description: true,
       options: {
         where: { isActive: true },
-        select: { id: true, durationMinutes: true, price: true },
+        select: { id: true, durationMinutes: true, price: true, promoPrice: true },
         orderBy: { durationMinutes: "asc" },
       },
     },
