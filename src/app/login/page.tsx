@@ -16,7 +16,11 @@ export default async function LoginPage({
 }) {
   const session = await getCurrentSession();
   if (session?.user) {
-    redirect(searchParams.callbackUrl ?? ROLE_HOME[session.user.role] ?? "/");
+    // Never honor `callbackUrl` for an already-authenticated session: the only way to land here
+    // while logged in is a wrong-role bounce (middleware/page guards send mismatched roles to
+    // /login with the blocked path as callbackUrl) — redirecting back to that same path would
+    // just bounce right back here again, looping forever. Always land on the role's own home.
+    redirect(ROLE_HOME[session.user.role] ?? "/");
   }
 
   const callbackUrl = searchParams.callbackUrl ?? "/dashboard";
