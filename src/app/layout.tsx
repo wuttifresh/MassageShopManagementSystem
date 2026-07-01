@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Sarabun, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 const sarabun = Sarabun({
   subsets: ["thai", "latin"],
@@ -37,7 +38,7 @@ export default function RootLayout({
       <body
         className={`${sarabun.variable} ${notoSansThai.variable} font-sans antialiased bg-neutral-50 text-neutral-900`}
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

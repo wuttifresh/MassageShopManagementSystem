@@ -2,12 +2,13 @@
 
 ระบบบริหารร้านนวดครบวงจร — ระบบจองคิว (ลูกค้า) + ระบบหลังบ้าน (เจ้าของ/พนักงาน/หมอนวด)
 
-กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 1 — Foundation & Schema** เสร็จแล้ว
+กำลังพัฒนาเป็น Phase ตามลำดับ สถานะปัจจุบัน: **Phase 2 — Auth & Roles** เสร็จแล้ว
 
 ## Tech Stack
 
 - Next.js 14 (App Router) + TypeScript (strict) + Tailwind CSS
 - PostgreSQL (Supabase) + Prisma ORM 7 (query compiler + `@prisma/adapter-pg` driver adapter)
+- NextAuth v4 (JWT session) — email+password (OWNER/STAFF/THERAPIST) + LINE Login (CUSTOMER)
 - Font: Sarabun / Noto Sans Thai, UI ภาษาไทย, mobile-first
 
 ## เริ่มต้นใช้งาน (Local development)
@@ -39,6 +40,18 @@ npm run build        # production build
 - `prisma/migrations/` — migration ที่ apply แล้ว (รวม raw SQL กัน double-booking ที่ระดับ DB)
 - `prisma/seed.ts` — seed data ตัวอย่าง
 - `src/lib/prisma.ts` — Prisma Client singleton (ใช้ driver adapter, ต้อง import จากตรงนี้เท่านั้น)
+
+## Auth (Phase 2)
+
+- `src/lib/auth.ts` — NextAuth config (credentials + LINE), `src/middleware.ts` — role-based route
+  protection, `src/lib/session.ts` — server-side session helper ดูรายละเอียดสถาปัตยกรรมใน
+  `prisma/ER.md` หัวข้อ "Phase 2 — Auth & Roles"
+- Route ตัวอย่างที่ถูกป้องกันด้วย role: `/dashboard` (OWNER/STAFF), `/therapist` (THERAPIST),
+  `/account` (CUSTOMER) — เข้าผิด role หรือยังไม่ login จะถูก redirect ไป `/login`
+- Demo login (จาก `npm run db:seed`, ห้ามใช้ค่านี้ใน production):
+  `owner@massageshop.test` / `staff@massageshop.test` / `nok@massageshop.test` — รหัสผ่าน
+  `Password123!` ทดสอบ LINE Login ต้องสร้าง LINE Login channel เองแล้วใส่
+  `LINE_CLIENT_ID`/`LINE_CLIENT_SECRET` ใน `.env`
 
 ## Hard rules (บังคับทุก Phase)
 

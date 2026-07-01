@@ -1,11 +1,17 @@
+import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL ?? process.env.DIRECT_URL });
 const prisma = new PrismaClient({ adapter });
 
+// Demo-only password for every seeded staff/owner/therapist account. Never reuse this in
+// production — it exists purely so Phase 2's login flow is testable out of the box.
+const DEMO_PASSWORD = "Password123!";
+
 async function main() {
   console.log("Seeding...");
+  const demoPasswordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const branch = await prisma.branch.upsert({
     where: { slug: "siam-square" },
@@ -22,11 +28,12 @@ async function main() {
 
   const owner = await prisma.user.upsert({
     where: { email: "owner@massageshop.test" },
-    update: {},
+    update: { passwordHash: demoPasswordHash },
     create: {
       role: "OWNER",
       name: "คุณเจ้าของร้าน",
       email: "owner@massageshop.test",
+      passwordHash: demoPasswordHash,
       phone: "0800000001",
       branchId: null,
     },
@@ -34,11 +41,12 @@ async function main() {
 
   const staff = await prisma.user.upsert({
     where: { email: "staff@massageshop.test" },
-    update: {},
+    update: { passwordHash: demoPasswordHash },
     create: {
       role: "STAFF",
       name: "พนักงานหน้าร้าน สมศรี",
       email: "staff@massageshop.test",
+      passwordHash: demoPasswordHash,
       phone: "0800000002",
       branchId: branch.id,
     },
@@ -46,16 +54,18 @@ async function main() {
 
   const therapistUsers = await Promise.all(
     [
-      { name: "หมอนวด นก", phone: "0800000010", nickname: "นก" },
-      { name: "หมอนวด แหวว", phone: "0800000011", nickname: "แหวว" },
-      { name: "หมอนวด อ้อย", phone: "0800000012", nickname: "อ้อย" },
+      { name: "หมอนวด นก", email: "nok@massageshop.test", phone: "0800000010", nickname: "นก" },
+      { name: "หมอนวด แหวว", email: "waew@massageshop.test", phone: "0800000011", nickname: "แหวว" },
+      { name: "หมอนวด อ้อย", email: "oi@massageshop.test", phone: "0800000012", nickname: "อ้อย" },
     ].map((t) =>
       prisma.user.upsert({
         where: { phone: t.phone },
-        update: {},
+        update: { email: t.email, passwordHash: demoPasswordHash },
         create: {
           role: "THERAPIST",
           name: t.name,
+          email: t.email,
+          passwordHash: demoPasswordHash,
           phone: t.phone,
           branchId: branch.id,
         },
@@ -204,11 +214,13 @@ async function main() {
 
   console.log("Seed complete:");
   console.log(`  Branch:      ${branch.name} (${branch.id})`);
-  console.log(`  Owner:       ${owner.email}`);
-  console.log(`  Staff:       ${staff.email}`);
-  console.log(`  Therapists:  ${therapists.map((t) => t.nickname).join(", ")}`);
+  console.log(`  Owner:       ${owner.email} / password: ${DEMO_PASSWORD}`);
+  console.log(`  Staff:       ${staff.email} / password: ${DEMO_PASSWORD}`);
+  console.log(
+    `  Therapists:  ${therapistUsers.map((u) => u.email).join(", ")} / password: ${DEMO_PASSWORD}`
+  );
   console.log(`  Services:    ${services.map((s) => s.name).join(", ")}`);
-  console.log(`  Customer:    ${customer.name} (${customer.phone})`);
+  console.log(`  Customer:    ${customer.name} (${customer.phone}) — logs in via LINE only`);
 }
 
 main()
