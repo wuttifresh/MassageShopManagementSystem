@@ -86,7 +86,6 @@ const th = {
     pleaseSelectService: "กรุณาเลือกบริการ",
   },
   queue: {
-    assign: "มอบหมาย",
     startService: "เริ่มนวด",
     checkout: "เช็คเอาท์ (เสร็จ)",
     cancelQueue: "ยกเลิกคิว",

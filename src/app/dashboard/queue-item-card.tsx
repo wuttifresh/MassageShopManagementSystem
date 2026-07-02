@@ -45,11 +45,14 @@ export function QueueItemCard({
   const isActive = queue.status === "WAITING" || queue.status === "ASSIGNED" || queue.status === "IN_PROGRESS";
   const statusLabel = dict.queueStatus[queue.status as keyof typeof dict.queueStatus] ?? queue.status;
 
-  function run(action: () => Promise<{ success: boolean; error?: string }>) {
+  function run(action: () => Promise<{ success: boolean; error?: string }>, onError?: () => void) {
     setError(null);
     startTransition(async () => {
       const result = await action();
-      if (!result.success && result.error) setError(result.error);
+      if (!result.success && result.error) {
+        setError(result.error);
+        onError?.();
+      }
     });
   }
 
@@ -68,10 +71,24 @@ export function QueueItemCard({
 
       {queue.status === "WAITING" && (
         therapistOptions.length > 0 ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex items-center gap-2">
             <Select
               value={pickedTherapistId}
-              onChange={(e) => setPickedTherapistId(e.target.value)}
+              disabled={isPending}
+              onChange={(e) => {
+                const nextTherapistId = e.target.value;
+                setPickedTherapistId(nextTherapistId);
+                // Assign as soon as a therapist is picked, rather than requiring a second tap on
+                // a separate "assign" button — on touch devices, the first tap after closing a
+                // native <select> picker often just dismisses it instead of hitting the button
+                // next to it, which reads as "the button doesn't work".
+                if (nextTherapistId) {
+                  run(
+                    () => assignTherapist(queue.id, nextTherapistId),
+                    () => setPickedTherapistId("")
+                  );
+                }
+              }}
               className="flex-1 bg-card"
             >
               <option value="">{dict.walkIn.selectTherapist}</option>
@@ -81,15 +98,12 @@ export function QueueItemCard({
                 </option>
               ))}
             </Select>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={!pickedTherapistId}
-              isLoading={isPending}
-              onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
-            >
-              {dict.queue.assign}
-            </Button>
+            {isPending && (
+              <svg className="h-5 w-5 shrink-0 animate-spin text-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            )}
           </div>
         ) : (
           <p className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 text-text-secondary">
