@@ -56,12 +56,12 @@ export function QueueItemCard({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 text-sm">
+    <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50/60 p-3 text-sm transition hover:border-neutral-300">
       <div className="flex items-center justify-between">
-        <span className="font-medium">
+        <span className="font-medium text-neutral-900">
           {queue.queueNumber} · {queue.customer?.name ?? queue.guestName ?? "ลูกค้า"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[queue.status] ?? ""}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[queue.status] ?? ""}`}>
           {STATUS_LABEL[queue.status] ?? queue.status}
         </span>
       </div>
@@ -75,7 +75,7 @@ export function QueueItemCard({
           <select
             value={pickedTherapistId}
             onChange={(e) => setPickedTherapistId(e.target.value)}
-            className="flex-1 rounded-lg border border-neutral-300 p-2 text-sm"
+            className="flex-1 rounded-lg border border-neutral-300 bg-white p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
           >
             <option value="">เลือกหมอนวด</option>
             {therapistOptions.map((t) => (
@@ -88,7 +88,7 @@ export function QueueItemCard({
             type="button"
             disabled={isPending || !pickedTherapistId}
             onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
-            className="rounded-lg bg-neutral-900 px-3 py-2 text-white disabled:opacity-50"
+            className="rounded-lg bg-teal-600 px-3 py-2 text-white transition hover:bg-teal-700 disabled:opacity-50"
           >
             มอบหมาย
           </button>
@@ -97,20 +97,20 @@ export function QueueItemCard({
 
       {queue.status === "ASSIGNED" && (
         <div className="flex gap-2">
-          <span className="flex-1 rounded-lg border border-neutral-200 p-2 text-neutral-500">
+          <span className="flex-1 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-500">
             หมอนวด: {queue.therapist?.nickname}
           </span>
           <input
             value={bedLabel}
             onChange={(e) => setBedLabel(e.target.value)}
             placeholder="เตียง"
-            className="w-20 rounded-lg border border-neutral-300 p-2"
+            className="w-20 rounded-lg border border-neutral-300 bg-white p-2 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
           />
           <button
             type="button"
             disabled={isPending}
             onClick={() => run(() => startService(queue.id, bedLabel))}
-            className="rounded-lg bg-neutral-900 px-3 py-2 text-white disabled:opacity-50"
+            className="rounded-lg bg-teal-600 px-3 py-2 text-white transition hover:bg-teal-700 disabled:opacity-50"
           >
             เริ่มนวด
           </button>
@@ -119,14 +119,14 @@ export function QueueItemCard({
 
       {queue.status === "IN_PROGRESS" && (
         <div className="flex gap-2">
-          <span className="flex-1 rounded-lg border border-neutral-200 p-2 text-neutral-500">
+          <span className="flex-1 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-500">
             หมอนวด: {queue.therapist?.nickname}
           </span>
           <button
             type="button"
             disabled={isPending}
             onClick={() => run(() => completeService(queue.id))}
-            className="rounded-lg bg-green-600 px-3 py-2 text-white disabled:opacity-50"
+            className="rounded-lg bg-green-600 px-3 py-2 text-white transition hover:bg-green-700 disabled:opacity-50"
           >
             เช็คเอาท์ (เสร็จ)
           </button>
