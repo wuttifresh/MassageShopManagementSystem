@@ -8,7 +8,10 @@ import { requireStaffSession } from "@/lib/staff-auth";
 
 type ActionResult<T = undefined> = { success: true; data: T } | { success: false; error: string };
 
-export async function checkInBooking(bookingId: string): Promise<ActionResult<{ queueId: string }>> {
+export async function checkInBooking(
+  bookingId: string,
+  therapistId?: string | null
+): Promise<ActionResult<{ queueId: string }>> {
   const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { queue: true } });
   if (!booking) return { success: false, error: "ไม่พบการจอง" };
 
@@ -17,6 +20,19 @@ export async function checkInBooking(bookingId: string): Promise<ActionResult<{ 
   if (booking.queue) return { success: false, error: "เช็คอินไปแล้ว" };
   if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.PENDING) {
     return { success: false, error: "ไม่สามารถเช็คอินการจองนี้ได้" };
+  }
+
+  // Staff can pick (or override) the therapist right at check-in; otherwise fall back to
+  // whoever the customer originally booked with, if anyone.
+  const finalTherapistId = therapistId || booking.therapistId;
+  if (finalTherapistId) {
+    const therapist = await prisma.therapist.findUnique({ where: { id: finalTherapistId } });
+    if (!therapist || therapist.deletedAt || therapist.branchId !== booking.branchId) {
+      return { success: false, error: "ไม่พบหมอนวดที่เลือก" };
+    }
+    if (await isTherapistBusy(finalTherapistId)) {
+      return { success: false, error: "หมอนวดคนนี้กำลังนวดลูกค้าคนอื่นอยู่" };
+    }
   }
 
   const queueNumber = await generateQueueNumber(booking.branchId);
@@ -30,9 +46,9 @@ export async function checkInBooking(bookingId: string): Promise<ActionResult<{ 
         guestName: booking.guestName,
         guestPhone: booking.guestPhone,
         serviceOptionId: booking.serviceOptionId,
-        therapistId: booking.therapistId,
+        therapistId: finalTherapistId,
         queueNumber,
-        status: booking.therapistId ? QueueStatus.ASSIGNED : QueueStatus.WAITING,
+        status: finalTherapistId ? QueueStatus.ASSIGNED : QueueStatus.WAITING,
         checkedInAt: new Date(),
       },
     });
@@ -45,7 +61,7 @@ export async function checkInBooking(bookingId: string): Promise<ActionResult<{ 
         action: "CHECK_IN",
         entityType: "Queue",
         entityId: created.id,
-        afterData: { bookingId: booking.id, status: created.status },
+        afterData: { bookingId: booking.id, status: created.status, therapistId: finalTherapistId },
       },
     });
 

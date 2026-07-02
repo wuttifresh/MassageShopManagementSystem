@@ -72,29 +72,35 @@ export function QueueItemCard({
       </p>
 
       {queue.status === "WAITING" && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Select
-            value={pickedTherapistId}
-            onChange={(e) => setPickedTherapistId(e.target.value)}
-            className="flex-1 bg-card"
-          >
-            <option value="">เลือกหมอนวด</option>
-            {therapistOptions.map((t) => (
-              <option key={t.id} value={t.id} disabled={t.busy}>
-                {t.nickname} {t.busy ? "(กำลังนวดอยู่)" : ""}
-              </option>
-            ))}
-          </Select>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={!pickedTherapistId}
-            isLoading={isPending}
-            onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
-          >
-            มอบหมาย
-          </Button>
-        </div>
+        therapistOptions.length > 0 ? (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Select
+              value={pickedTherapistId}
+              onChange={(e) => setPickedTherapistId(e.target.value)}
+              className="flex-1 bg-card"
+            >
+              <option value="">เลือกหมอนวด</option>
+              {therapistOptions.map((t) => (
+                <option key={t.id} value={t.id} disabled={t.busy}>
+                  {t.nickname} {t.busy ? "(กำลังนวดอยู่)" : ""}
+                </option>
+              ))}
+            </Select>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!pickedTherapistId}
+              isLoading={isPending}
+              onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
+            >
+              มอบหมาย
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 text-text-secondary">
+            ยังไม่มีหมอนวดพร้อมทำงานในสาขานี้ — เพิ่มหมอนวดหรือตั้งสถานะ &quot;พร้อมทำงาน&quot; ก่อน
+          </p>
+        )
       )}
 
       {queue.status === "ASSIGNED" && (
