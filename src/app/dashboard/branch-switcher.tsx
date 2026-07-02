@@ -18,7 +18,7 @@ export function BranchSwitcher({
     <select
       value={activeBranchId}
       onChange={(e) => router.push(`${pathname}?branchId=${e.target.value}`)}
-      className="rounded-lg border border-neutral-300 p-2 text-sm"
+      className="flex-1 rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
     >
       {branches.map((b) => (
         <option key={b.id} value={b.id}>

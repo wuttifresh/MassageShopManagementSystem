@@ -69,20 +69,20 @@ export function WalkInForm({ branchId }: { branchId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
         <input
           value={guestName}
           onChange={(e) => setGuestName(e.target.value)}
           placeholder="ชื่อลูกค้า"
           required
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
+          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         />
         <input
           value={guestPhone}
           onChange={(e) => setGuestPhone(e.target.value)}
           placeholder="เบอร์โทร (ไม่บังคับ)"
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
+          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         />
       </div>
 
@@ -93,7 +93,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
           setServiceOptionId("");
         }}
         required
-        className="rounded-lg border border-neutral-300 p-2 text-sm"
+        className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
       >
         <option value="">เลือกบริการ</option>
         {services.map((s) => (
@@ -108,7 +108,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
           value={serviceOptionId}
           onChange={(e) => setServiceOptionId(e.target.value)}
           required
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
+          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         >
           <option value="">เลือกระยะเวลา</option>
           {selectedService.options.map((o) => (
@@ -123,7 +123,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
         <select
           value={therapistId}
           onChange={(e) => setTherapistId(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
+          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         >
           <option value="">คนไหนก็ได้ (มอบหมายทีหลัง)</option>
           {therapists.map((t) => (
@@ -140,7 +140,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-50"
       >
         {isSubmitting ? "กำลังเพิ่ม..." : "+ เพิ่มคิว"}
       </button>
