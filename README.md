@@ -152,6 +152,9 @@ npm run build        # production build
 - **`supabase/deploy.sql`** — รวม migration ทั้งหมดเป็นไฟล์เดียว วางใน Supabase SQL Editor รันได้เลย
   โดยไม่ต้องมี Node/Prisma CLI (generate จาก `npm run db:build-sql` → `scripts/build-supabase-sql.mjs`
   ต้องรันคำสั่งนี้ใหม่ทุกครั้งที่เพิ่ม migration ใหม่ ไฟล์นี้ไม่ auto-sync)
+- **`supabase/seed.sql`** — ข้อมูลตัวอย่าง (สาขา/บัญชี login/บริการ/หมอนวด/ลูกค้าตัวอย่าง) แบบ
+  SQL-only เทียบเท่า `npm run db:seed` สำหรับกรณีไม่มี Node — รันหลัง `deploy.sql` เท่านั้น รันซ้ำได้
+  ปลอดภัย (ใช้ `ON CONFLICT` ทุกจุด ไม่สร้างข้อมูลซ้ำ)
 
 ## Hard rules (บังคับทุก Phase)
 
