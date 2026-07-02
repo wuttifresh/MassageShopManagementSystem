@@ -88,7 +88,6 @@ const en: Dictionary = {
     pleaseSelectService: "Please select a service",
   },
   queue: {
-    assign: "Assign",
     startService: "Start service",
     checkout: "Check out (done)",
     cancelQueue: "Cancel queue",
