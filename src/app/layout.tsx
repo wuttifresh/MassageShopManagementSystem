@@ -36,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body
-        className={`${sarabun.variable} ${notoSansThai.variable} font-sans antialiased bg-neutral-50 text-neutral-900`}
+        className={`${sarabun.variable} ${notoSansThai.variable} font-sans antialiased bg-background text-foreground`}
       >
         <Providers>{children}</Providers>
       </body>

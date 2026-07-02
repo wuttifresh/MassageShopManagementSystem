@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { addWalkInQueue } from "./actions";
+import { Input, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/toast";
 
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string };
 
 export function WalkInForm({ branchId }: { branchId: string }) {
+  const { showToast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [serviceId, setServiceId] = useState("");
@@ -17,7 +22,6 @@ export function WalkInForm({ branchId }: { branchId: string }) {
   const [guestPhone, setGuestPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/services")
@@ -39,7 +43,6 @@ export function WalkInForm({ branchId }: { branchId: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
     if (!serviceOptionId) {
       setError("กรุณาเลือกบริการ");
       return;
@@ -60,7 +63,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
       return;
     }
 
-    setSuccess(`เพิ่มคิวสำเร็จ`);
+    showToast({ variant: "success", title: "เพิ่มคิวสำเร็จ" });
     setGuestName("");
     setGuestPhone("");
     setServiceId("");
@@ -69,31 +72,28 @@ export function WalkInForm({ branchId }: { branchId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2">
-        <input
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Input
           value={guestName}
           onChange={(e) => setGuestName(e.target.value)}
           placeholder="ชื่อลูกค้า"
           required
-          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         />
-        <input
+        <Input
           value={guestPhone}
           onChange={(e) => setGuestPhone(e.target.value)}
           placeholder="เบอร์โทร (ไม่บังคับ)"
-          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         />
       </div>
 
-      <select
+      <Select
         value={serviceId}
         onChange={(e) => {
           setServiceId(e.target.value);
           setServiceOptionId("");
         }}
         required
-        className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
       >
         <option value="">เลือกบริการ</option>
         {services.map((s) => (
@@ -101,49 +101,35 @@ export function WalkInForm({ branchId }: { branchId: string }) {
             {s.name}
           </option>
         ))}
-      </select>
+      </Select>
 
       {selectedService && (
-        <select
-          value={serviceOptionId}
-          onChange={(e) => setServiceOptionId(e.target.value)}
-          required
-          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-        >
+        <Select value={serviceOptionId} onChange={(e) => setServiceOptionId(e.target.value)} required>
           <option value="">เลือกระยะเวลา</option>
           {selectedService.options.map((o) => (
             <option key={o.id} value={o.id}>
               {o.durationMinutes} นาที ({o.promoPrice ? `฿${o.promoPrice} ปกติ ฿${o.price}` : `฿${o.price}`})
             </option>
           ))}
-        </select>
+        </Select>
       )}
 
       {serviceId && (
-        <select
-          value={therapistId}
-          onChange={(e) => setTherapistId(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-        >
+        <Select value={therapistId} onChange={(e) => setTherapistId(e.target.value)}>
           <option value="">คนไหนก็ได้ (มอบหมายทีหลัง)</option>
           {therapists.map((t) => (
             <option key={t.id} value={t.id}>
               {t.nickname}
             </option>
           ))}
-        </select>
+        </Select>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">{success}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-50"
-      >
-        {isSubmitting ? "กำลังเพิ่ม..." : "+ เพิ่มคิว"}
-      </button>
+      <Button type="submit" variant="secondary" isLoading={isSubmitting} fullWidth>
+        + เพิ่มคิว
+      </Button>
     </form>
   );
 }

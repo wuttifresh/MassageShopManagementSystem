@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireOwnerPage } from "@/lib/require-owner-page";
 import { EditStaffForm } from "./edit-staff-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function EditStaffPage({ params }: { params: { id: string } }) {
   await requireOwnerPage(`/dashboard/staff/${params.id}`);
@@ -16,16 +17,15 @@ export default async function EditStaffPage({ params }: { params: { id: string }
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/staff" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">แก้ไข {staffMember.name}</h1>
-      <EditStaffForm
-        userId={staffMember.id}
-        branches={branches}
-        initial={{ branchId: staffMember.branchId ?? branches[0]?.id ?? "", isActive: staffMember.isActive }}
-      />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/staff" title={`แก้ไข ${staffMember.name}`} />
+      <Card>
+        <EditStaffForm
+          userId={staffMember.id}
+          branches={branches}
+          initial={{ branchId: staffMember.branchId ?? branches[0]?.id ?? "", isActive: staffMember.isActive }}
+        />
+      </Card>
+    </div>
   );
 }

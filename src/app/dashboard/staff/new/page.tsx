@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOwnerPage } from "@/lib/require-owner-page";
 import { NewStaffForm } from "./new-staff-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function NewStaffPage() {
   await requireOwnerPage("/dashboard/staff/new");
@@ -12,12 +13,11 @@ export default async function NewStaffPage() {
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/staff" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">เพิ่มพนักงาน</h1>
-      <NewStaffForm branches={branches} />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/staff" title="เพิ่มพนักงาน" />
+      <Card>
+        <NewStaffForm branches={branches} />
+      </Card>
+    </div>
   );
 }

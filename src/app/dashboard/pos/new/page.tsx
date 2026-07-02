@@ -1,9 +1,11 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { Checkout, type PrefillLineItem } from "./checkout";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function NewSalePage({
   searchParams,
@@ -62,25 +64,20 @@ export default async function NewSalePage({
   }
 
   if (!branchId) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-        <p>ยังไม่มีสาขาที่ใช้งานอยู่</p>
-      </main>
-    );
+    return <EmptyState icon="🏢" title="ยังไม่มีสาขาที่ใช้งานอยู่" className="mt-10" />;
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/pos" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">ขายใหม่</h1>
-      <Checkout
-        branchId={branchId}
-        queueId={queueId}
-        prefillItem={prefillItem}
-        customerPackages={customerPackages}
-      />
-    </main>
+    <div className="mx-auto flex max-w-xl flex-col gap-5">
+      <PageHeader backHref="/dashboard/pos" title="ขายใหม่" />
+      <Card>
+        <Checkout
+          branchId={branchId}
+          queueId={queueId}
+          prefillItem={prefillItem}
+          customerPackages={customerPackages}
+        />
+      </Card>
+    </div>
   );
 }

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { upsertScheduleDay } from "./actions";
+import { Select, Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 type ScheduleStatus = "WORKING" | "DAY_OFF" | "LEAVE";
 
@@ -50,51 +53,46 @@ function Row({ initial, therapistId }: { initial: DayRow; therapistId: string })
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 text-sm">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{DATE_FORMAT.format(new Date(row.date))}</span>
-        <select
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-gray-900">{DATE_FORMAT.format(new Date(row.date))}</span>
+        <Select
           value={row.status}
           onChange={(e) => setRow((r) => ({ ...r, status: e.target.value as ScheduleStatus }))}
-          className="rounded-lg border border-neutral-300 p-1 text-sm"
+          className="w-auto py-1.5"
         >
           {Object.entries(STATUS_LABEL).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {row.status === "WORKING" && (
         <div className="flex items-center gap-2">
-          <input
+          <Input
             type="time"
             value={row.startTime}
             onChange={(e) => setRow((r) => ({ ...r, startTime: e.target.value }))}
-            className="rounded-lg border border-neutral-300 p-1"
+            className="py-1.5"
           />
-          <span>ถึง</span>
-          <input
+          <span className="text-text-secondary">ถึง</span>
+          <Input
             type="time"
             value={row.endTime}
             onChange={(e) => setRow((r) => ({ ...r, endTime: e.target.value }))}
-            className="rounded-lg border border-neutral-300 p-1"
+            className="py-1.5"
           />
         </div>
       )}
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={handleSave}
-          className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isSaving ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
-        {savedAt && <span className="text-xs text-green-600">บันทึกแล้ว</span>}
-        {error && <span className="text-xs text-red-600">{error}</span>}
+        <Button type="button" size="sm" variant="outline" isLoading={isSaving} onClick={handleSave}>
+          บันทึก
+        </Button>
+        {savedAt && <Badge variant="success">บันทึกแล้ว</Badge>}
+        {error && <span className="text-xs font-medium text-danger">{error}</span>}
       </div>
     </div>
   );
@@ -102,7 +100,7 @@ function Row({ initial, therapistId }: { initial: DayRow; therapistId: string })
 
 export function ScheduleEditor({ therapistId, initialDays }: { therapistId: string; initialDays: DayRow[] }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       {initialDays.map((day) => (
         <Row key={day.date} initial={day} therapistId={therapistId} />
       ))}

@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { NewTherapistForm } from "./new-therapist-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function NewTherapistPage({
   searchParams,
@@ -24,12 +25,11 @@ export default async function NewTherapistPage({
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/therapists" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">เพิ่มหมอนวด</h1>
-      <NewTherapistForm branchId={activeBranchId} services={services} />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/therapists" title="เพิ่มหมอนวด" />
+      <Card>
+        <NewTherapistForm branchId={activeBranchId} services={services} />
+      </Card>
+    </div>
   );
 }

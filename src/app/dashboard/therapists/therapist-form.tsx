@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Field } from "@/components/ui/field";
+import { Input, Textarea, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Service = { id: string; name: string };
 
@@ -64,93 +68,83 @@ export function TherapistForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        ชื่อเล่น
-        <input
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <Field label="ชื่อเล่น" required>
+        <Input
           value={values.nickname}
           onChange={(e) => setValues((v) => ({ ...v, nickname: e.target.value }))}
           required
-          className="rounded-lg border border-neutral-300 p-2"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        แนะนำตัว
-        <textarea
+      <Field label="แนะนำตัว" hint="ไม่บังคับ">
+        <Textarea
           value={values.bio}
           onChange={(e) => setValues((v) => ({ ...v, bio: e.target.value }))}
-          className="rounded-lg border border-neutral-300 p-2"
           rows={2}
         />
-      </label>
+      </Field>
 
       {isEditing && (
-        <label className="flex flex-col gap-1 text-sm">
-          สถานะ
-          <select
+        <Field label="สถานะ">
+          <Select
             value={values.status}
             onChange={(e) => setValues((v) => ({ ...v, status: e.target.value as TherapistFormValues["status"] }))}
-            className="rounded-lg border border-neutral-300 p-2"
           >
             <option value="ACTIVE">พร้อมทำงาน</option>
             <option value="ON_LEAVE">ลาพัก</option>
             <option value="INACTIVE">ไม่ทำงานแล้ว</option>
-          </select>
-        </label>
+          </Select>
+        </Field>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-sm">
-          ประเภทค่ามือ
-          <select
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="ประเภทค่ามือ">
+          <Select
             value={values.commissionType}
             onChange={(e) =>
               setValues((v) => ({ ...v, commissionType: e.target.value as TherapistFormValues["commissionType"] }))
             }
-            className="rounded-lg border border-neutral-300 p-2"
           >
             <option value="PERCENTAGE">เปอร์เซ็นต์ (%)</option>
             <option value="FIXED_AMOUNT">บาท/ครั้ง</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          อัตราค่ามือ
-          <input
+          </Select>
+        </Field>
+        <Field label="อัตราค่ามือ" required>
+          <Input
             type="number"
             min={0}
             step="0.01"
             value={values.commissionRate}
             onChange={(e) => setValues((v) => ({ ...v, commissionRate: e.target.value }))}
             required
-            className="rounded-lg border border-neutral-300 p-2"
           />
-        </label>
+        </Field>
       </div>
 
-      <fieldset className="flex flex-col gap-1 text-sm">
-        <legend className="mb-1">ความถนัด</legend>
-        {services.map((s) => (
-          <label key={s.id} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={values.specialtyServiceIds.includes(s.id)}
-              onChange={() => toggleSpecialty(s.id)}
-            />
-            {s.name}
-          </label>
-        ))}
+      <fieldset className="flex flex-col gap-2 text-sm">
+        <legend className="mb-1 font-medium text-gray-700">ความถนัด</legend>
+        <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+          {services.length === 0 && <p className="text-text-secondary">ยังไม่มีบริการในระบบ</p>}
+          {services.map((s) => (
+            <label key={s.id} className="flex items-center gap-2.5 text-gray-700">
+              <input
+                type="checkbox"
+                checked={values.specialtyServiceIds.includes(s.id)}
+                onChange={() => toggleSpecialty(s.id)}
+                className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
+              />
+              {s.name}
+            </label>
+          ))}
+        </div>
       </fieldset>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
-      </button>
+      <Button type="submit" isLoading={isSubmitting} fullWidth>
+        บันทึก
+      </Button>
     </form>
   );
 }

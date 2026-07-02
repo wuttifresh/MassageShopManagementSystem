@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { ScheduleEditor } from "./schedule-editor";
+import { PageHeader } from "@/components/ui/page-header";
 
 const DAY_COUNT = 14;
 
@@ -44,12 +44,9 @@ export default async function TherapistSchedulePage({ params }: { params: { id: 
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href={`/dashboard/therapists/${therapist.id}`} className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">ตารางเวร: {therapist.nickname}</h1>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref={`/dashboard/therapists/${therapist.id}`} title={`ตารางเวร: ${therapist.nickname}`} />
       <ScheduleEditor therapistId={therapist.id} initialDays={initialDays} />
-    </main>
+    </div>
   );
 }

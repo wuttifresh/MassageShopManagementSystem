@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/session";
 import { NewServiceForm } from "./new-service-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function NewServicePage() {
   const session = await getCurrentSession();
@@ -10,12 +11,11 @@ export default async function NewServicePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/services" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">เพิ่มบริการ</h1>
-      <NewServiceForm />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/services" title="เพิ่มบริการ" />
+      <Card>
+        <NewServiceForm />
+      </Card>
+    </div>
   );
 }

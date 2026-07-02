@@ -2,33 +2,47 @@
 
 import { useState, useTransition } from "react";
 import { voidTransaction } from "./actions";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 
 export function VoidTransactionButton({ transactionId }: { transactionId: string }) {
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleClick() {
-    const reason = prompt("เหตุผลที่ยกเลิกใบเสร็จนี้:");
-    if (!reason || !reason.trim()) return;
-
+  function handleConfirm(reason?: string) {
+    if (!reason?.trim()) return;
     setError(null);
     startTransition(async () => {
       const result = await voidTransaction(transactionId, reason);
-      if (!result.success) setError(result.error);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      showToast({ variant: "success", title: "ยกเลิกใบเสร็จแล้ว" });
     });
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={handleClick}
-        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50"
-      >
-        {isPending ? "กำลังยกเลิก..." : "ยกเลิกใบเสร็จ"}
-      </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
+    <>
+      <Button type="button" size="sm" variant="outline" className="text-danger" onClick={() => setOpen(true)}>
+        ยกเลิกใบเสร็จ
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={handleConfirm}
+        title="ยกเลิกใบเสร็จนี้?"
+        description="กรุณาระบุเหตุผลที่ยกเลิกใบเสร็จนี้ การกระทำนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ยืนยันยกเลิก"
+        requireReason
+        reasonLabel="เหตุผลที่ยกเลิก"
+        isLoading={isPending}
+      />
+      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+    </>
   );
 }

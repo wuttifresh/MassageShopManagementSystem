@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Field } from "@/components/ui/field";
+import { Input, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type Branch = { id: string; name: string };
 
@@ -29,44 +32,27 @@ export function ReportFilterForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
+    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
       {showBranchPicker && (
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
-          สาขา
-          <select
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            className="rounded-lg border border-neutral-300 p-2 text-sm"
-          >
+        <Field label="สาขา" className="col-span-2 sm:w-48">
+          <Select value={branchId} onChange={(e) => setBranchId(e.target.value)}>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
       )}
-      <label className="flex flex-col gap-1 text-xs text-neutral-500">
-        ตั้งแต่วันที่
-        <input
-          type="date"
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-neutral-500">
-        ถึงวันที่
-        <input
-          type="date"
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2 text-sm"
-        />
-      </label>
-      <button type="submit" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
+      <Field label="ตั้งแต่วันที่" className="sm:w-44">
+        <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+      </Field>
+      <Field label="ถึงวันที่" className="sm:w-44">
+        <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+      </Field>
+      <Button type="submit" className="col-span-2 sm:col-span-1">
         ดูรายงาน
-      </button>
+      </Button>
     </form>
   );
 }

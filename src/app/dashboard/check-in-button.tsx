@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { checkInBooking } from "./actions";
+import { Button } from "@/components/ui/button";
 
 export function CheckInButton({ bookingId }: { bookingId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -17,15 +18,10 @@ export function CheckInButton({ bookingId }: { bookingId: string }) {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={handleClick}
-        className="rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-50"
-      >
-        {isPending ? "กำลังเช็คอิน..." : "เช็คอิน"}
-      </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      <Button type="button" size="sm" variant="secondary" isLoading={isPending} onClick={handleClick}>
+        เช็คอิน
+      </Button>
+      {error && <p className="text-xs font-medium text-danger">{error}</p>}
     </div>
   );
 }

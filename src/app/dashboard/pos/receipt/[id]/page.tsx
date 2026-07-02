@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { PrintButton } from "./print-button";
+import { BackLink } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "เงินสด",
@@ -42,83 +43,83 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
   if (session.user.role === "STAFF" && session.user.branchId !== transaction.branchId) notFound();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4 print:p-0">
+    <div className="mx-auto flex max-w-md flex-col gap-4 print:max-w-none">
       <div className="flex items-center justify-between print:hidden">
-        <Link href="/dashboard/pos" className="text-sm text-neutral-400">
-          ← กลับ
-        </Link>
+        <BackLink href="/dashboard/pos" />
         <PrintButton />
       </div>
 
-      <div className="flex flex-col gap-4 rounded-xl border border-neutral-200 p-4 text-sm print:border-none">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 text-sm shadow-card print:border-none print:shadow-none">
         <div className="text-center">
-          <p className="text-lg font-semibold">{transaction.branch.name}</p>
-          {transaction.branch.address && <p className="text-neutral-500">{transaction.branch.address}</p>}
+          <p className="text-lg font-semibold text-gray-900">{transaction.branch.name}</p>
+          {transaction.branch.address && <p className="text-text-secondary">{transaction.branch.address}</p>}
         </div>
 
-        <div className="flex justify-between border-t border-dashed border-neutral-300 pt-3">
-          <span className="text-neutral-500">เลขที่ใบเสร็จ</span>
-          <span className="font-medium">{transaction.receiptNo}</span>
+        <div className="flex justify-between border-t border-dashed border-border pt-3">
+          <span className="text-text-secondary">เลขที่ใบเสร็จ</span>
+          <span className="font-medium text-gray-900">{transaction.receiptNo}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-neutral-500">วันที่</span>
-          <span>{DATE_FORMAT.format(transaction.createdAt)}</span>
+          <span className="text-text-secondary">วันที่</span>
+          <span className="text-gray-900">{DATE_FORMAT.format(transaction.createdAt)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-neutral-500">แคชเชียร์</span>
-          <span>{transaction.cashier.name}</span>
+          <span className="text-text-secondary">แคชเชียร์</span>
+          <span className="text-gray-900">{transaction.cashier.name}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-neutral-500">สถานะ</span>
-          <span>{STATUS_LABEL[transaction.status] ?? transaction.status}</span>
+        <div className="flex items-center justify-between">
+          <span className="text-text-secondary">สถานะ</span>
+          <Badge variant={transaction.status === "PAID" ? "success" : transaction.status === "VOIDED" ? "danger" : "neutral"}>
+            {STATUS_LABEL[transaction.status] ?? transaction.status}
+          </Badge>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-dashed border-neutral-300 pt-3">
+        <div className="flex flex-col gap-2 border-t border-dashed border-border pt-3">
           {transaction.items.map((item) => (
-            <div key={item.id} className="flex justify-between">
-              <div>
-                <p>
+            <div key={item.id} className="flex justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-gray-900">
                   {item.serviceOption.service.name} ({item.serviceOption.durationMinutes} นาที)
                   {item.quantity > 1 ? ` x${item.quantity}` : ""}
                 </p>
-                <p className="text-xs text-neutral-500">หมอนวด: {item.therapist?.nickname ?? "-"}</p>
+                <p className="text-xs text-text-secondary">หมอนวด: {item.therapist?.nickname ?? "-"}</p>
               </div>
-              <span>฿{item.lineTotal.toString()}</span>
+              <span className="shrink-0 text-gray-900">฿{item.lineTotal.toString()}</span>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-col gap-1 border-t border-dashed border-neutral-300 pt-3">
+        <div className="flex flex-col gap-1 border-t border-dashed border-border pt-3">
           <div className="flex justify-between">
-            <span className="text-neutral-500">ยอดรวม</span>
-            <span>฿{transaction.subtotal.toString()}</span>
+            <span className="text-text-secondary">ยอดรวม</span>
+            <span className="text-gray-900">฿{transaction.subtotal.toString()}</span>
           </div>
           {Number(transaction.discountAmount) > 0 && (
             <div className="flex justify-between">
-              <span className="text-neutral-500">ส่วนลด</span>
-              <span>-฿{transaction.discountAmount.toString()}</span>
+              <span className="text-text-secondary">ส่วนลด</span>
+              <span className="text-gray-900">-฿{transaction.discountAmount.toString()}</span>
             </div>
           )}
-          <div className="flex justify-between text-xs text-neutral-400">
+          <div className="flex justify-between text-xs text-gray-400">
             <span>ในนี้รวม VAT {transaction.vatRate.toString()}%</span>
             <span>฿{transaction.vatAmount.toString()}</span>
           </div>
-          <div className="flex justify-between text-base font-semibold">
+          <div className="flex justify-between text-base font-semibold text-gray-900">
             <span>ยอดสุทธิ</span>
             <span>฿{transaction.totalAmount.toString()}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-neutral-500">ชำระโดย</span>
-            <span>{PAYMENT_LABEL[transaction.paymentMethod] ?? transaction.paymentMethod}</span>
+            <span className="text-text-secondary">ชำระโดย</span>
+            <span className="text-gray-900">{PAYMENT_LABEL[transaction.paymentMethod] ?? transaction.paymentMethod}</span>
           </div>
         </div>
 
         {transaction.status === "VOIDED" && (
-          <p className="border-t border-dashed border-neutral-300 pt-3 text-red-600">
+          <p className="border-t border-dashed border-border pt-3 text-danger">
             ยกเลิกแล้ว: {transaction.voidReason}
           </p>
         )}
       </div>
-    </main>
+    </div>
   );
 }
