@@ -9,7 +9,7 @@ import { WalkInForm } from "./walk-in-form";
 import { QueueItemCard } from "./queue-item-card";
 import { BranchSwitcher } from "./branch-switcher";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardHeader, ListRow } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -104,7 +104,10 @@ export default async function DashboardPage({
             ) : (
               <div className="flex flex-col gap-2.5">
                 {checkInCandidates.map((booking) => (
-                  <ListRow key={booking.id} interactive={false}>
+                  <div
+                    key={booking.id}
+                    className="flex flex-col items-stretch gap-3 rounded-xl border border-border bg-card p-3.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:p-4"
+                  >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-gray-900">
                         {booking.customer?.name ?? booking.guestName ?? "ลูกค้า"} ·{" "}
@@ -119,8 +122,12 @@ export default async function DashboardPage({
                         น. · หมอนวด {booking.therapist?.nickname ?? "คนไหนก็ได้"}
                       </p>
                     </div>
-                    <CheckInButton bookingId={booking.id} />
-                  </ListRow>
+                    <CheckInButton
+                      bookingId={booking.id}
+                      therapistOptions={therapistOptions}
+                      initialTherapistId={booking.therapistId}
+                    />
+                  </div>
                 ))}
               </div>
             )}

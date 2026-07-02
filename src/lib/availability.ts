@@ -30,14 +30,25 @@ function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): bool
 }
 
 /// Therapists at a branch who are active and capable of performing the given service.
+///
+/// Specialty is a preference, not a hard capability gate: if no therapist at the branch has
+/// this service listed as a specialty yet (a common gap right after a branch/service is set
+/// up), fall back to every active therapist at the branch instead of returning an empty list —
+/// otherwise staff would see a dropdown with no names at all and no way to book anyone.
 export async function getEligibleTherapists(branchId: string, serviceId: string) {
-  return prisma.therapist.findMany({
+  const bySpecialty = await prisma.therapist.findMany({
     where: {
       branchId,
       status: TherapistStatus.ACTIVE,
       deletedAt: null,
       specialties: { some: { serviceId } },
     },
+    orderBy: { nickname: "asc" },
+  });
+  if (bySpecialty.length > 0) return bySpecialty;
+
+  return prisma.therapist.findMany({
+    where: { branchId, status: TherapistStatus.ACTIVE, deletedAt: null },
     orderBy: { nickname: "asc" },
   });
 }
