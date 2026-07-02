@@ -1,13 +1,11 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 export function PrintButton() {
   return (
-    <button
-      type="button"
-      onClick={() => window.print()}
-      className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
-    >
+    <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
       พิมพ์ใบเสร็จ
-    </button>
+    </Button>
   );
 }

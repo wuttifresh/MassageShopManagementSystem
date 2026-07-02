@@ -1,8 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { EditTherapistForm } from "./edit-therapist-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { LinkButton } from "@/components/ui/link-button";
 
 export default async function EditTherapistPage({ params }: { params: { id: string } }) {
   const session = await getCurrentSession();
@@ -23,31 +25,27 @@ export default async function EditTherapistPage({ params }: { params: { id: stri
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/therapists" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">แก้ไขข้อมูลหมอนวด</h1>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/therapists" title="แก้ไขข้อมูลหมอนวด" />
 
-      <Link
-        href={`/dashboard/therapists/${therapist.id}/schedule`}
-        className="rounded-lg border border-neutral-300 px-4 py-2 text-center text-sm"
-      >
+      <LinkButton variant="outline" href={`/dashboard/therapists/${therapist.id}/schedule`} fullWidth>
         จัดการตารางเวร / วันหยุด
-      </Link>
+      </LinkButton>
 
-      <EditTherapistForm
-        therapistId={therapist.id}
-        services={services}
-        initial={{
-          nickname: therapist.nickname,
-          bio: therapist.bio ?? "",
-          status: therapist.status,
-          commissionType: therapist.commissionType,
-          commissionRate: therapist.commissionRate.toString(),
-          specialtyServiceIds: therapist.specialties.map((s) => s.serviceId),
-        }}
-      />
-    </main>
+      <Card>
+        <EditTherapistForm
+          therapistId={therapist.id}
+          services={services}
+          initial={{
+            nickname: therapist.nickname,
+            bio: therapist.bio ?? "",
+            status: therapist.status,
+            commissionType: therapist.commissionType,
+            commissionRate: therapist.commissionRate.toString(),
+            specialtyServiceIds: therapist.specialties.map((s) => s.serviceId),
+          }}
+        />
+      </Card>
+    </div>
   );
 }

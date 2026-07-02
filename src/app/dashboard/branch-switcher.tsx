@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { Select } from "@/components/ui/input";
 
 type Branch = { id: string; name: string };
 
@@ -15,16 +16,17 @@ export function BranchSwitcher({
   const pathname = usePathname();
 
   return (
-    <select
+    <Select
       value={activeBranchId}
       onChange={(e) => router.push(`${pathname}?branchId=${e.target.value}`)}
-      className="flex-1 rounded-lg border border-neutral-300 p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+      className="max-w-xs"
+      aria-label="เลือกสาขา"
     >
       {branches.map((b) => (
         <option key={b.id} value={b.id}>
           {b.name}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

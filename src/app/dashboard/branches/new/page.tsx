@@ -1,17 +1,17 @@
-import Link from "next/link";
 import { requireOwnerPage } from "@/lib/require-owner-page";
 import { NewBranchForm } from "./new-branch-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function NewBranchPage() {
   await requireOwnerPage("/dashboard/branches/new");
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href="/dashboard/branches" className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">เพิ่มสาขา</h1>
-      <NewBranchForm />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref="/dashboard/branches" title="เพิ่มสาขา" />
+      <Card>
+        <NewBranchForm />
+      </Card>
+    </div>
   );
 }

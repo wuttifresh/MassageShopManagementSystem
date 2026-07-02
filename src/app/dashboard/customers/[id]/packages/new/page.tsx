@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { SellPackageForm } from "./sell-package-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export default async function NewPackagePage({
   params,
@@ -29,12 +30,11 @@ export default async function NewPackagePage({
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <Link href={`/dashboard/customers/${customer.id}`} className="text-sm text-neutral-400">
-        ← กลับ
-      </Link>
-      <h1 className="text-xl font-semibold">ขายคอร์สให้ {customer.name}</h1>
-      <SellPackageForm customerId={customer.id} branchId={branchId} services={services} />
-    </main>
+    <div className="mx-auto flex max-w-lg flex-col gap-5">
+      <PageHeader backHref={`/dashboard/customers/${customer.id}`} title={`ขายคอร์สให้ ${customer.name}`} />
+      <Card>
+        <SellPackageForm customerId={customer.id} branchId={branchId} services={services} />
+      </Card>
+    </div>
   );
 }

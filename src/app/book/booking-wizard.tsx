@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBooking } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/cn";
 
 type Branch = { id: string; name: string; slug: string; address: string | null };
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
@@ -120,16 +124,17 @@ export function BookingWizard() {
 
   if (step === "done") {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-        <p className="text-lg font-semibold text-green-700">จองคิวสำเร็จ!</p>
-        <p className="text-sm text-neutral-600">เจอกันที่ร้านตามเวลาที่จองไว้นะคะ</p>
-        <button
-          type="button"
-          onClick={() => router.push("/account")}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
-        >
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-success/20 bg-success-light p-6 text-center animate-slide-up">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success text-white">
+          <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <p className="text-lg font-semibold text-success-hover">จองคิวสำเร็จ!</p>
+        <p className="text-sm text-gray-600">เจอกันที่ร้านตามเวลาที่จองไว้นะคะ</p>
+        <Button type="button" onClick={() => router.push("/account")}>
           ดูการจองของฉัน
-        </button>
+        </Button>
       </div>
     );
   }
@@ -197,9 +202,10 @@ export function BookingWizard() {
                   key={value}
                   type="button"
                   onClick={() => setDate(value)}
-                  className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 text-xs ${
-                    selected ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"
-                  }`}
+                  className={cn(
+                    "flex shrink-0 flex-col items-center rounded-xl border px-3.5 py-2.5 text-xs transition-colors",
+                    selected ? "border-primary bg-primary text-white shadow-soft" : "border-border bg-card text-gray-700 hover:border-primary/40"
+                  )}
                 >
                   <span>{WEEKDAY_FORMAT.format(d)}</span>
                   <span className="font-medium">{DAY_FORMAT.format(d)}</span>
@@ -211,7 +217,7 @@ export function BookingWizard() {
           {date && (
             <div className="grid grid-cols-3 gap-2">
               {slots.length === 0 && (
-                <p className="col-span-3 text-center text-sm text-neutral-400">
+                <p className="col-span-3 text-center text-sm text-text-secondary">
                   ไม่มีคิวว่างในวันนี้ ลองเลือกวันอื่นดูนะคะ
                 </p>
               )}
@@ -223,7 +229,7 @@ export function BookingWizard() {
                     setTime(slot);
                     setStep("confirm");
                   }}
-                  className="rounded-lg border border-neutral-300 py-2 text-sm hover:border-neutral-900"
+                  className="rounded-xl border border-border bg-card py-2.5 text-sm font-medium text-gray-700 transition-colors hover:border-primary hover:bg-primary-light hover:text-primary"
                 >
                   {slot}
                 </button>
@@ -235,7 +241,7 @@ export function BookingWizard() {
 
       {step === "confirm" && selectedBranch && selectedService && selectedOption && date && time && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 p-4 text-sm">
+          <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 text-sm shadow-card">
             <Row label="สาขา" value={selectedBranch.name} />
             <Row label="บริการ" value={`${selectedService.name} (${selectedOption.durationMinutes} นาที)`} />
             <Row label="หมอนวด" value={selectedTherapist ? selectedTherapist.nickname : "คนไหนก็ได้"} />
@@ -251,22 +257,24 @@ export function BookingWizard() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <Alert variant="danger">{error}</Alert>}
 
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={handleConfirm}
-            className="rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {isLoading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
-          </button>
+          <Button type="button" size="lg" isLoading={isLoading} onClick={handleConfirm} fullWidth>
+            ยืนยันการจอง
+          </Button>
         </div>
       )}
 
       {step !== "branch" && (
-        <button type="button" onClick={() => goBack(step, setStep)} className="text-sm text-neutral-400">
-          ← ย้อนกลับ
+        <button
+          type="button"
+          onClick={() => goBack(step, setStep)}
+          className="inline-flex w-fit items-center gap-1 text-sm font-medium text-text-secondary hover:text-primary"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+          </svg>
+          ย้อนกลับ
         </button>
       )}
     </div>
@@ -281,12 +289,14 @@ function goBack(step: Step, setStep: (s: Step) => void) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-neutral-500">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div className="flex justify-between gap-3">
+      <span className="text-text-secondary">{label}</span>
+      <span className="text-right font-medium text-gray-900">{value}</span>
     </div>
   );
 }
+
+const STEP_ORDER: Step[] = ["branch", "service", "duration", "therapist", "datetime", "confirm"];
 
 function Breadcrumb({ step }: { step: Step }) {
   const labels: Record<Step, string> = {
@@ -298,7 +308,26 @@ function Breadcrumb({ step }: { step: Step }) {
     confirm: "ยืนยันการจอง",
     done: "เสร็จสิ้น",
   };
-  return <p className="text-sm font-medium text-neutral-500">{labels[step]}</p>;
+  const currentIndex = STEP_ORDER.indexOf(step);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-1.5">
+        {STEP_ORDER.map((s, i) => (
+          <span
+            key={s}
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-colors",
+              i <= currentIndex ? "bg-primary" : "bg-gray-200"
+            )}
+          />
+        ))}
+      </div>
+      <p className="text-sm font-medium text-text-secondary">
+        ขั้นตอน {currentIndex + 1}/{STEP_ORDER.length} · {labels[step]}
+      </p>
+    </div>
+  );
 }
 
 function StepList({
@@ -309,20 +338,26 @@ function StepList({
   onSelect: (id: string) => void;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-neutral-400">กำลังโหลด...</p>;
+    return (
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           onClick={() => onSelect(item.id)}
-          className="flex flex-col rounded-lg border border-neutral-300 p-3 text-left hover:border-neutral-900"
+          className="flex flex-col rounded-xl border border-border bg-card p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-card-hover"
         >
-          <span className="font-medium">{item.label}</span>
-          {item.sub && <span className="text-sm text-neutral-500">{item.sub}</span>}
+          <span className="font-medium text-gray-900">{item.label}</span>
+          {item.sub && <span className="text-sm text-text-secondary">{item.sub}</span>}
         </button>
       ))}
     </div>

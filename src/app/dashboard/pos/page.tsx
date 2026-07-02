@@ -5,12 +5,24 @@ import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { BranchSwitcher } from "@/app/dashboard/branch-switcher";
 import { VoidTransactionButton } from "./void-transaction-button";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardHeader, ListRow } from "@/components/ui/card";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/link-button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const STATUS_LABEL: Record<string, string> = {
   PAID: "ชำระแล้ว",
   VOIDED: "ยกเลิกแล้ว",
   REFUNDED: "คืนเงินแล้ว",
   PENDING: "รอชำระ",
+};
+
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  PAID: "success",
+  VOIDED: "danger",
+  REFUNDED: "warning",
+  PENDING: "neutral",
 };
 
 export default async function PosPage({ searchParams }: { searchParams: { branchId?: string } }) {
@@ -26,11 +38,7 @@ export default async function PosPage({ searchParams }: { searchParams: { branch
 
   const activeBranchId = await resolveActiveBranchId(session.user, searchParams.branchId);
   if (!activeBranchId) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 p-4">
-        <p>ยังไม่มีสาขาที่ใช้งานอยู่</p>
-      </main>
-    );
+    return <EmptyState icon="🏢" title="ยังไม่มีสาขาที่ใช้งานอยู่" className="mt-10" />;
   }
 
   const [unpaidQueues, recentTransactions] = await Promise.all([
@@ -47,70 +55,66 @@ export default async function PosPage({ searchParams }: { searchParams: { branch
   ]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/dashboard" className="text-sm text-neutral-400">
-            ← กลับแดชบอร์ด
-          </Link>
-          <h1 className="text-xl font-semibold">POS / ชำระเงิน</h1>
-        </div>
-        <Link
-          href="/dashboard/pos/new"
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
-        >
-          + ขายใหม่
-        </Link>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="POS / ชำระเงิน"
+        description="รับชำระเงินและดูรายการขายล่าสุด"
+        actions={<LinkButton href="/dashboard/pos/new">+ ขายใหม่</LinkButton>}
+      />
 
-      {session.user.role === "OWNER" && (
-        <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />
-      )}
+      {session.user.role === "OWNER" && <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />}
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">รอชำระเงิน ({unpaidQueues.length})</h2>
-        {unpaidQueues.length === 0 && <p className="text-sm text-neutral-400">ไม่มีคิวที่รอชำระเงิน</p>}
-        {unpaidQueues.map((q) => (
-          <Link
-            key={q.id}
-            href={`/dashboard/pos/new?queueId=${q.id}`}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 p-3 text-sm hover:border-neutral-900"
-          >
-            <div>
-              <p className="font-medium">
-                {q.queueNumber} · {q.customer?.name ?? q.guestName ?? "ลูกค้า"}
-              </p>
-              <p className="text-neutral-500">
-                {q.serviceOption.service.name} ({q.serviceOption.durationMinutes} นาที) · หมอนวด{" "}
-                {q.therapist?.nickname ?? "-"}
-              </p>
-            </div>
-            <span className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white">
-              ชำระเงิน
-            </span>
-          </Link>
-        ))}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">รายการล่าสุด</h2>
-        {recentTransactions.map((t) => (
-          <div
-            key={t.id}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 p-3 text-sm"
-          >
-            <Link href={`/dashboard/pos/receipt/${t.id}`} className="flex-1">
-              <p className="font-medium">
-                {t.receiptNo} · ฿{t.totalAmount.toString()}
-              </p>
-              <p className="text-neutral-500">
-                {t.paymentMethod} · {STATUS_LABEL[t.status] ?? t.status}
-              </p>
-            </Link>
-            {t.status === "PAID" && <VoidTransactionButton transactionId={t.id} />}
+      <Card>
+        <CardHeader title="รอชำระเงิน" action={<Badge variant="warning">{unpaidQueues.length}</Badge>} />
+        {unpaidQueues.length === 0 ? (
+          <EmptyState icon="✅" title="ไม่มีคิวที่รอชำระเงิน" />
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {unpaidQueues.map((q) => (
+              <Link key={q.id} href={`/dashboard/pos/new?queueId=${q.id}`}>
+                <ListRow>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-gray-900">
+                      {q.queueNumber} · {q.customer?.name ?? q.guestName ?? "ลูกค้า"}
+                    </p>
+                    <p className="truncate text-text-secondary">
+                      {q.serviceOption.service.name} ({q.serviceOption.durationMinutes} นาที) · หมอนวด{" "}
+                      {q.therapist?.nickname ?? "-"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
+                    ชำระเงิน
+                  </span>
+                </ListRow>
+              </Link>
+            ))}
           </div>
-        ))}
-      </section>
-    </main>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader title="รายการล่าสุด" />
+        {recentTransactions.length === 0 ? (
+          <EmptyState icon="🧾" title="ยังไม่มีรายการ" />
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {recentTransactions.map((t) => (
+              <ListRow key={t.id} interactive={false}>
+                <Link href={`/dashboard/pos/receipt/${t.id}`} className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-gray-900">
+                    {t.receiptNo} · ฿{t.totalAmount.toString()}
+                  </p>
+                  <p className="truncate text-text-secondary">
+                    {t.paymentMethod} · {STATUS_LABEL[t.status] ?? t.status}
+                  </p>
+                </Link>
+                <Badge variant={STATUS_BADGE[t.status] ?? "neutral"}>{STATUS_LABEL[t.status] ?? t.status}</Badge>
+                {t.status === "PAID" && <VoidTransactionButton transactionId={t.id} />}
+              </ListRow>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }

@@ -9,8 +9,8 @@ export default async function BookPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <h1 className="text-xl font-semibold">จองคิวนวด</h1>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-5 p-4 sm:p-6">
+      <h1 className="text-xl font-semibold text-gray-900">จองคิวนวด</h1>
       <BookingWizard />
     </main>
   );

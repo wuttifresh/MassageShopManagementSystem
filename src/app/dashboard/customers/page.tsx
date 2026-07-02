@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { SearchForm } from "./search-form";
+import { PageHeader } from "@/components/ui/page-header";
+import { ListRow } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function CustomersPage({ searchParams }: { searchParams: { q?: string } }) {
   const session = await getCurrentSession();
@@ -30,36 +34,34 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
     : [];
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 p-4">
-      <Link href="/dashboard" className="text-sm text-neutral-400">
-        ← กลับแดชบอร์ด
-      </Link>
-      <h1 className="text-xl font-semibold">ลูกค้า</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader title="ลูกค้า" description="ค้นหาและจัดการข้อมูลลูกค้า" />
 
       <SearchForm initialQuery={query ?? ""} />
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         {query && customers.length === 0 && (
-          <p className="text-sm text-neutral-400">ไม่พบลูกค้าที่ตรงกับ &quot;{query}&quot;</p>
+          <EmptyState icon="🔍" title={`ไม่พบลูกค้าที่ตรงกับ "${query}"`} />
+        )}
+        {!query && (
+          <EmptyState icon="👤" title="ค้นหาลูกค้าเพื่อดูรายละเอียด" description="พิมพ์ชื่อหรือเบอร์โทรด้านบน" />
         )}
         {customers.map((c) => (
-          <Link
-            key={c.id}
-            href={`/dashboard/customers/${c.id}`}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 p-3 text-sm hover:border-neutral-900"
-          >
-            <div>
-              <p className="font-medium">{c.name}</p>
-              <p className="text-neutral-500">{c.phone ?? "ไม่มีเบอร์โทร"}</p>
-            </div>
-            {c.membership && (
-              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs">
-                {c.membership.tier} · {c.membership.points} แต้ม
-              </span>
-            )}
+          <Link key={c.id} href={`/dashboard/customers/${c.id}`}>
+            <ListRow>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-900">{c.name}</p>
+                <p className="text-text-secondary">{c.phone ?? "ไม่มีเบอร์โทร"}</p>
+              </div>
+              {c.membership && (
+                <Badge variant="primary">
+                  {c.membership.tier} · {c.membership.points} แต้ม
+                </Badge>
+              )}
+            </ListRow>
           </Link>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

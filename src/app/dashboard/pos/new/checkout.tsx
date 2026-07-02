@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PaymentMethod } from "@/generated/prisma/client";
 import { createTransaction, type CheckoutLineItemInput } from "../actions";
+import { Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 export type PrefillLineItem = {
   serviceOptionId: string;
@@ -181,7 +184,7 @@ export function Checkout({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {items.map((item) => {
           const service = services.find((s) => s.id === item.serviceId);
           const option = findOption(item.serviceId, item.serviceOptionId);
@@ -189,15 +192,14 @@ export function Checkout({
           const packages = item.serviceId ? eligiblePackages(item.serviceId) : [];
 
           return (
-            <div key={item.key} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 text-sm">
-              <select
+            <div key={item.key} className="flex flex-col gap-2.5 rounded-xl border border-border p-3.5 text-sm">
+              <Select
                 value={item.serviceId}
                 onChange={(e) => {
                   const serviceId = e.target.value;
                   updateLineItem(item.key, { serviceId, serviceOptionId: "", therapistId: "", packageId: "" });
                   if (serviceId) loadTherapists(serviceId);
                 }}
-                className="rounded-lg border border-neutral-300 p-2"
               >
                 <option value="">เลือกบริการ</option>
                 {services.map((s) => (
@@ -205,13 +207,12 @@ export function Checkout({
                     {s.name}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {service && (
-                <select
+                <Select
                   value={item.serviceOptionId}
                   onChange={(e) => updateLineItem(item.key, { serviceOptionId: e.target.value })}
-                  className="rounded-lg border border-neutral-300 p-2"
                 >
                   <option value="">เลือกระยะเวลา</option>
                   {service.options.map((o) => (
@@ -219,14 +220,13 @@ export function Checkout({
                       {o.durationMinutes} นาที ({o.promoPrice ? `฿${o.promoPrice} ปกติ ฿${o.price}` : `฿${o.price}`})
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
 
               {item.serviceId && (
-                <select
+                <Select
                   value={item.therapistId}
                   onChange={(e) => updateLineItem(item.key, { therapistId: e.target.value })}
-                  className="rounded-lg border border-neutral-300 p-2"
                 >
                   <option value="">เลือกหมอนวด</option>
                   {therapists.map((t) => (
@@ -234,14 +234,13 @@ export function Checkout({
                       {t.nickname}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
 
               {packages.length > 0 && (
-                <select
+                <Select
                   value={item.packageId}
                   onChange={(e) => updateLineItem(item.key, { packageId: e.target.value })}
-                  className="rounded-lg border border-neutral-300 p-2"
                 >
                   <option value="">ชำระด้วยเงิน/โอน/บัตร</option>
                   {packages.map((p) => (
@@ -249,11 +248,11 @@ export function Checkout({
                       ใช้คอร์ส: {p.name} (เหลือ {p.remainingSessions} ครั้ง)
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
 
               {option && (
-                <p className="text-neutral-500">
+                <p className="font-medium text-text-secondary">
                   {item.packageId
                     ? "฿0 (ตัดจากคอร์ส)"
                     : `รวม: ฿${Number(option.promoPrice ?? option.price) * item.quantity}`}
@@ -263,7 +262,7 @@ export function Checkout({
               <button
                 type="button"
                 onClick={() => removeLineItem(item.key)}
-                className="self-start text-xs text-red-500"
+                className="self-start text-xs font-medium text-danger hover:text-danger-hover"
               >
                 ลบรายการนี้
               </button>
@@ -274,13 +273,13 @@ export function Checkout({
         <button
           type="button"
           onClick={addLineItem}
-          className="self-start rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
+          className="self-start rounded-xl border border-dashed border-border px-3.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-light"
         >
           + เพิ่มรายการ
         </button>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
         ส่วนลด (บาท)
         <input
           type="number"
@@ -288,45 +287,37 @@ export function Checkout({
           step="0.01"
           value={discountAmount}
           onChange={(e) => setDiscountAmount(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2"
+          className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
         วิธีชำระเงิน
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-          className="rounded-lg border border-neutral-300 p-2"
-        >
+        <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
           {PAYMENT_METHODS.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
-      <div className="flex flex-col gap-1 rounded-lg border border-neutral-200 p-3 text-sm">
+      <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-gray-50/60 p-3.5 text-sm">
         <div className="flex justify-between">
-          <span className="text-neutral-500">ยอดรวม</span>
-          <span>฿{subtotal.toFixed(2)}</span>
+          <span className="text-text-secondary">ยอดรวม</span>
+          <span className="text-gray-900">฿{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-neutral-500">ยอดสุทธิ (รวม VAT {vatAmount.toFixed(2)} บาท)</span>
-          <span className="font-medium">฿{totalAmount.toFixed(2)}</span>
+          <span className="text-text-secondary">ยอดสุทธิ (รวม VAT {vatAmount.toFixed(2)} บาท)</span>
+          <span className="text-base font-semibold text-gray-900">฿{totalAmount.toFixed(2)}</span>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "กำลังบันทึก..." : "รับชำระเงิน"}
-      </button>
+      <Button type="submit" size="lg" isLoading={isSubmitting} fullWidth>
+        รับชำระเงิน
+      </Button>
     </form>
   );
 }

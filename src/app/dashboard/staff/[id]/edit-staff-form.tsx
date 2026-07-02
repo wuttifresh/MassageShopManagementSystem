@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateStaffAssignment } from "../actions";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Branch = { id: string; name: string };
 
@@ -35,36 +39,32 @@ export function EditStaffForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        สาขาที่ประจำ
-        <select
-          value={branchId}
-          onChange={(e) => setBranchId(e.target.value)}
-          className="rounded-lg border border-neutral-300 p-2"
-        >
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <Field label="สาขาที่ประจำ">
+        <Select value={branchId} onChange={(e) => setBranchId(e.target.value)}>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+      <label className="flex items-center gap-2.5 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
+        />
         บัญชีนี้ใช้งานได้ (ปิดไว้ = ล็อกอินไม่ได้)
       </label>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
-      </button>
+      <Button type="submit" isLoading={isSubmitting} fullWidth>
+        บันทึก
+      </Button>
     </form>
   );
 }

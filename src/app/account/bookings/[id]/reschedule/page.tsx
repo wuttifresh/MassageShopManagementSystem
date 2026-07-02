@@ -18,11 +18,11 @@ export default async function ReschedulePage({ params }: { params: { id: string 
   if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") notFound();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-4">
-      <h1 className="text-xl font-semibold">เลื่อนนัด</h1>
-      <div className="rounded-xl border border-neutral-200 p-4 text-sm">
-        <p className="font-medium">{booking.serviceOption.service.name}</p>
-        <p className="text-neutral-500">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-5 p-4 sm:p-6">
+      <h1 className="text-xl font-semibold text-gray-900">เลื่อนนัด</h1>
+      <div className="rounded-2xl border border-border bg-card p-4 text-sm shadow-card">
+        <p className="font-medium text-gray-900">{booking.serviceOption.service.name}</p>
+        <p className="text-text-secondary">
           {booking.serviceOption.durationMinutes} นาที · หมอนวด{" "}
           {booking.therapist?.nickname ?? "คนไหนก็ได้"}
         </p>

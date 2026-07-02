@@ -3,15 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f8fafc;
+  --foreground: #111827;
 }
 
 body {
@@ -19,8 +12,48 @@ body {
   background: var(--background);
 }
 
+* {
+  border-color: #e5e7eb;
+}
+
+::selection {
+  background: #bfdbfe;
+}
+
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Thin, unobtrusive scrollbars for sidebars and scroll containers */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, #e5e7eb 0px, #f3f4f6 40px, #e5e7eb 80px);
+    background-size: 600px 100%;
+    @apply animate-shimmer rounded-lg;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
   }
 }

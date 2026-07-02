@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { rescheduleBooking } from "@/app/account/actions";
+import { Alert } from "@/components/ui/alert";
+import { cn } from "@/lib/cn";
 
 const DAY_COUNT = 14;
 const WEEKDAY_FORMAT = new Intl.DateTimeFormat("th-TH", { weekday: "short", timeZone: "UTC" });
@@ -81,9 +83,10 @@ export function ReschedulePicker({
               key={value}
               type="button"
               onClick={() => setDate(value)}
-              className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 text-xs ${
-                selected ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"
-              }`}
+              className={cn(
+                "flex shrink-0 flex-col items-center rounded-xl border px-3.5 py-2.5 text-xs transition-colors",
+                selected ? "border-primary bg-primary text-white shadow-soft" : "border-border bg-card text-gray-700 hover:border-primary/40"
+              )}
             >
               <span>{WEEKDAY_FORMAT.format(d)}</span>
               <span className="font-medium">{DAY_FORMAT.format(d)}</span>
@@ -95,7 +98,7 @@ export function ReschedulePicker({
       {date && (
         <div className="grid grid-cols-3 gap-2">
           {slots.length === 0 && (
-            <p className="col-span-3 text-center text-sm text-neutral-400">
+            <p className="col-span-3 text-center text-sm text-text-secondary">
               ไม่มีคิวว่างในวันนี้ ลองเลือกวันอื่นดูนะคะ
             </p>
           )}
@@ -105,7 +108,7 @@ export function ReschedulePicker({
               type="button"
               disabled={isSubmitting}
               onClick={() => handlePick(slot)}
-              className="rounded-lg border border-neutral-300 py-2 text-sm hover:border-neutral-900 disabled:opacity-50"
+              className="rounded-xl border border-border bg-card py-2.5 text-sm font-medium text-gray-700 transition-colors hover:border-primary hover:bg-primary-light hover:text-primary disabled:opacity-50"
             >
               {slot}
             </button>
@@ -113,7 +116,7 @@ export function ReschedulePicker({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
     </div>
   );
 }

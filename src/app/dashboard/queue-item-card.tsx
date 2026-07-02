@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { assignTherapist, cancelQueue, completeService, startService } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { Select, Input } from "@/components/ui/input";
 
 type TherapistOption = { id: string; nickname: string; busy: boolean };
 
@@ -25,12 +28,12 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "ยกเลิกแล้ว",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  WAITING: "bg-amber-100 text-amber-700",
-  ASSIGNED: "bg-blue-100 text-blue-700",
-  IN_PROGRESS: "bg-green-100 text-green-700",
-  DONE: "bg-neutral-100 text-neutral-500",
-  CANCELLED: "bg-red-100 text-red-500",
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  WAITING: "warning",
+  ASSIGNED: "info",
+  IN_PROGRESS: "success",
+  DONE: "neutral",
+  CANCELLED: "danger",
 };
 
 export function QueueItemCard({
@@ -56,26 +59,24 @@ export function QueueItemCard({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50/60 p-3 text-sm transition hover:border-neutral-300">
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-neutral-900">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-gray-50/60 p-3.5 text-sm transition-colors hover:border-gray-300">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-gray-900">
           {queue.queueNumber} · {queue.customer?.name ?? queue.guestName ?? "ลูกค้า"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[queue.status] ?? ""}`}>
-          {STATUS_LABEL[queue.status] ?? queue.status}
-        </span>
+        <Badge variant={STATUS_BADGE[queue.status] ?? "neutral"}>{STATUS_LABEL[queue.status] ?? queue.status}</Badge>
       </div>
-      <p className="text-neutral-500">
+      <p className="text-text-secondary">
         {queue.serviceOption.service.name} ({queue.serviceOption.durationMinutes} นาที)
         {queue.bedLabel ? ` · เตียง ${queue.bedLabel}` : ""}
       </p>
 
       {queue.status === "WAITING" && (
-        <div className="flex gap-2">
-          <select
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Select
             value={pickedTherapistId}
             onChange={(e) => setPickedTherapistId(e.target.value)}
-            className="flex-1 rounded-lg border border-neutral-300 bg-white p-2 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+            className="flex-1 bg-card"
           >
             <option value="">เลือกหมอนวด</option>
             {therapistOptions.map((t) => (
@@ -83,53 +84,44 @@ export function QueueItemCard({
                 {t.nickname} {t.busy ? "(กำลังนวดอยู่)" : ""}
               </option>
             ))}
-          </select>
-          <button
+          </Select>
+          <Button
             type="button"
-            disabled={isPending || !pickedTherapistId}
+            variant="secondary"
+            disabled={!pickedTherapistId}
+            isLoading={isPending}
             onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
-            className="rounded-lg bg-teal-600 px-3 py-2 text-white transition hover:bg-teal-700 disabled:opacity-50"
           >
             มอบหมาย
-          </button>
+          </Button>
         </div>
       )}
 
       {queue.status === "ASSIGNED" && (
-        <div className="flex gap-2">
-          <span className="flex-1 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-500">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <span className="flex flex-1 items-center rounded-xl border border-border bg-card px-3.5 py-2.5 text-text-secondary">
             หมอนวด: {queue.therapist?.nickname}
           </span>
-          <input
+          <Input
             value={bedLabel}
             onChange={(e) => setBedLabel(e.target.value)}
             placeholder="เตียง"
-            className="w-20 rounded-lg border border-neutral-300 bg-white p-2 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+            className="sm:w-24"
           />
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => run(() => startService(queue.id, bedLabel))}
-            className="rounded-lg bg-teal-600 px-3 py-2 text-white transition hover:bg-teal-700 disabled:opacity-50"
-          >
+          <Button type="button" variant="secondary" isLoading={isPending} onClick={() => run(() => startService(queue.id, bedLabel))}>
             เริ่มนวด
-          </button>
+          </Button>
         </div>
       )}
 
       {queue.status === "IN_PROGRESS" && (
-        <div className="flex gap-2">
-          <span className="flex-1 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-500">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <span className="flex flex-1 items-center rounded-xl border border-border bg-card px-3.5 py-2.5 text-text-secondary">
             หมอนวด: {queue.therapist?.nickname}
           </span>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => run(() => completeService(queue.id))}
-            className="rounded-lg bg-green-600 px-3 py-2 text-white transition hover:bg-green-700 disabled:opacity-50"
-          >
+          <Button type="button" variant="success" isLoading={isPending} onClick={() => run(() => completeService(queue.id))}>
             เช็คเอาท์ (เสร็จ)
-          </button>
+          </Button>
         </div>
       )}
 
@@ -138,13 +130,13 @@ export function QueueItemCard({
           type="button"
           disabled={isPending}
           onClick={() => run(() => cancelQueue(queue.id))}
-          className="self-start text-xs text-red-500 disabled:opacity-50"
+          className="self-start text-xs font-medium text-danger transition-colors hover:text-danger-hover disabled:opacity-50"
         >
           ยกเลิกคิว
         </button>
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs font-medium text-danger">{error}</p>}
     </div>
   );
 }

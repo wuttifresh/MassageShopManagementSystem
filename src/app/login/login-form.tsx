@@ -2,6 +2,10 @@
 
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   const [email, setEmail] = useState("");
@@ -32,51 +36,38 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   }
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          อีเมล (เจ้าของ/พนักงาน/หมอนวด)
-          <input
+    <div className="flex w-full max-w-sm flex-col gap-6 rounded-2xl border border-border bg-card p-6 shadow-card">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="อีเมล (เจ้าของ/พนักงาน/หมอนวด)" required>
+          <Input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
             placeholder="staff@massageshop.test"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          รหัสผ่าน
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
-          />
-        </label>
+        </Field>
+        <Field label="รหัสผ่าน" required>
+          <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert variant="danger">{error}</Alert>}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
-        </button>
+        <Button type="submit" isLoading={isSubmitting} fullWidth>
+          เข้าสู่ระบบ
+        </Button>
       </form>
 
-      <div className="flex items-center gap-3 text-xs text-neutral-400">
-        <span className="h-px flex-1 bg-neutral-200" />
+      <div className="flex items-center gap-3 text-xs text-gray-400">
+        <span className="h-px flex-1 bg-border" />
         หรือ
-        <span className="h-px flex-1 bg-neutral-200" />
+        <span className="h-px flex-1 bg-border" />
       </div>
 
       <button
         type="button"
         onClick={() => signIn("line", { callbackUrl })}
-        className="rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#06C755] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
       >
         เข้าสู่ระบบด้วย LINE (ลูกค้า)
       </button>

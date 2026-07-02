@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { updateServiceOption } from "../actions";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 
 type Values = { price: string; promoPrice: string; isActive: boolean };
 
@@ -14,10 +17,10 @@ export function ServiceOptionRow({
   durationMinutes: number;
   initial: Values;
 }) {
+  const { showToast } = useToast();
   const [values, setValues] = useState<Values>(initial);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   async function handleSave() {
     setError(null);
@@ -28,57 +31,50 @@ export function ServiceOptionRow({
       setError(result.error);
       return;
     }
-    setSavedAt(Date.now());
+    showToast({ variant: "success", title: `บันทึกตัวเลือก ${durationMinutes} นาทีแล้ว` });
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 text-sm">
-      <p className="font-medium">{durationMinutes} นาที</p>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1">
+    <div className="flex flex-col gap-3 rounded-xl border border-border p-3.5 text-sm">
+      <p className="font-medium text-gray-900">{durationMinutes} นาที</p>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
           ราคาปกติ
-          <input
+          <Input
             type="number"
             min={0}
             step="0.01"
             value={values.price}
             onChange={(e) => setValues((v) => ({ ...v, price: e.target.value }))}
-            className="rounded-lg border border-neutral-300 p-2"
           />
         </label>
-        <label className="flex flex-col gap-1">
-          ราคาโปรโมชั่น (ไม่บังคับ)
-          <input
+        <label className="flex flex-col gap-1.5">
+          ราคาโปรโมชั่น
+          <Input
             type="number"
             min={0}
             step="0.01"
             placeholder="ไม่มีโปรโมชั่น"
             value={values.promoPrice}
             onChange={(e) => setValues((v) => ({ ...v, promoPrice: e.target.value }))}
-            className="rounded-lg border border-neutral-300 p-2"
           />
         </label>
       </div>
-      <label className="flex items-center gap-2">
+      <label className="flex items-center gap-2.5 text-gray-700">
         <input
           type="checkbox"
           checked={values.isActive}
           onChange={(e) => setValues((v) => ({ ...v, isActive: e.target.checked }))}
+          className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
         />
         เปิดขายตัวเลือกนี้
       </label>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={isSubmitting}
-          onClick={handleSave}
-          className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
-        {savedAt && <span className="text-xs text-green-600">บันทึกแล้ว</span>}
-        {error && <span className="text-xs text-red-600">{error}</span>}
+        <Button type="button" size="sm" variant="outline" isLoading={isSubmitting} onClick={handleSave}>
+          บันทึก
+        </Button>
+        {error && <span className="text-xs font-medium text-danger">{error}</span>}
       </div>
     </div>
   );

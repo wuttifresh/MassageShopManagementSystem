@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createStaff } from "../actions";
+import { Field } from "@/components/ui/field";
+import { Input, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Branch = { id: string; name: string };
 
@@ -29,65 +33,40 @@ export function NewStaffForm({ branches }: { branches: Branch[] }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        ชื่อ
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="rounded-lg border border-neutral-300 p-2"
-        />
-      </label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <Field label="ชื่อ" required>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required />
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        อีเมล
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded-lg border border-neutral-300 p-2"
-        />
-      </label>
+      <Field label="อีเมล" required>
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)
-        <input
+      <Field label="รหัสผ่าน" required hint="อย่างน้อย 8 ตัวอักษร">
+        <Input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={8}
-          className="rounded-lg border border-neutral-300 p-2"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        สาขาที่ประจำ
-        <select
-          value={branchId}
-          onChange={(e) => setBranchId(e.target.value)}
-          required
-          className="rounded-lg border border-neutral-300 p-2"
-        >
+      <Field label="สาขาที่ประจำ" required>
+        <Select value={branchId} onChange={(e) => setBranchId(e.target.value)} required>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
-      </button>
+      <Button type="submit" isLoading={isSubmitting} fullWidth>
+        บันทึก
+      </Button>
     </form>
   );
 }
