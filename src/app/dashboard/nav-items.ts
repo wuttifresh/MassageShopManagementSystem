@@ -1,19 +1,22 @@
+import type { Dictionary } from "@/i18n/get-dictionary";
+
 export type NavItem = {
   href: string;
-  label: string;
+  labelKey: keyof Dictionary["nav"];
   icon: string;
   ownerOnly?: boolean;
 };
 
 /// Shared nav config for the dashboard sidebar/drawer. `icon` keys into the path map in
-/// nav-icon.tsx — kept as plain data here so it can be reused by both desktop and mobile nav.
+/// nav-icon.tsx, and `labelKey` looks up dict.nav[labelKey] — kept as plain data here so it can
+/// be reused by both desktop and mobile nav.
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "แดชบอร์ดคิว", icon: "home" },
-  { href: "/dashboard/pos", label: "POS / ชำระเงิน", icon: "pos" },
-  { href: "/dashboard/customers", label: "ลูกค้า", icon: "users" },
-  { href: "/dashboard/therapists", label: "จัดการหมอนวด", icon: "sparkles" },
-  { href: "/dashboard/services", label: "จัดการบริการ", icon: "tag" },
-  { href: "/dashboard/reports", label: "รายงาน", icon: "chart" },
-  { href: "/dashboard/branches", label: "จัดการสาขา", icon: "building", ownerOnly: true },
-  { href: "/dashboard/staff", label: "พนักงาน", icon: "id", ownerOnly: true },
+  { href: "/dashboard", labelKey: "dashboard", icon: "home" },
+  { href: "/dashboard/pos", labelKey: "pos", icon: "pos" },
+  { href: "/dashboard/customers", labelKey: "customers", icon: "users" },
+  { href: "/dashboard/therapists", labelKey: "therapists", icon: "sparkles" },
+  { href: "/dashboard/services", labelKey: "services", icon: "tag" },
+  { href: "/dashboard/reports", labelKey: "reports", icon: "chart" },
+  { href: "/dashboard/branches", labelKey: "branches", icon: "building", ownerOnly: true },
+  { href: "/dashboard/staff", labelKey: "staff", icon: "id", ownerOnly: true },
 ];

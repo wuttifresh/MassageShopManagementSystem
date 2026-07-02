@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import { cancelBooking } from "./actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTranslation } from "@/i18n/locale-provider";
 
 export function CancelBookingButton({ bookingId }: { bookingId: string }) {
+  const { dict } = useTranslation();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,15 +27,15 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
   return (
     <div className="flex flex-1 flex-col gap-1">
       <Button type="button" variant="outline" className="border-danger/30 text-danger hover:bg-danger-light" fullWidth onClick={() => setOpen(true)}>
-        ยกเลิก
+        {dict.account.cancelBooking}
       </Button>
       <ConfirmDialog
         open={open}
         onClose={() => setOpen(false)}
         onConfirm={handleConfirm}
-        title="ยืนยันการยกเลิกการจองนี้?"
-        description="คุณจะไม่สามารถย้อนกลับการยกเลิกนี้ได้"
-        confirmLabel="ยกเลิกการจอง"
+        title={dict.account.confirmCancelTitle}
+        description={dict.account.confirmCancelDescription}
+        confirmLabel={dict.account.confirmCancelLabel}
         isLoading={isPending}
       />
       {error && <p className="text-xs font-medium text-danger">{error}</p>}

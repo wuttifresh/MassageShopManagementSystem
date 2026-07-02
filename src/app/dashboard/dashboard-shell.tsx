@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { DropdownMenu, DropdownItem } from "@/components/ui/dropdown-menu";
+import { useTranslation } from "@/i18n/locale-provider";
 import { NAV_ITEMS } from "./nav-items";
 import { NavIcon } from "./nav-icon";
 
@@ -15,6 +16,7 @@ function isActive(pathname: string, href: string) {
 
 function NavLinks({ role, onNavigate }: { role: string; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { dict } = useTranslation();
   const items = NAV_ITEMS.filter((item) => !item.ownerOnly || role === "OWNER");
 
   return (
@@ -34,7 +36,7 @@ function NavLinks({ role, onNavigate }: { role: string; onNavigate?: () => void 
             }`}
           >
             <NavIcon name={item.icon} className="h-5 w-5 shrink-0" />
-            {item.label}
+            {dict.nav[item.labelKey]}
           </Link>
         );
       })}
@@ -43,29 +45,41 @@ function NavLinks({ role, onNavigate }: { role: string; onNavigate?: () => void 
 }
 
 function Brand() {
+  const { dict } = useTranslation();
   return (
     <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5">
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-soft">
         <NavIcon name="sparkles" className="h-5 w-5" />
       </div>
-      <span className="text-sm font-semibold text-gray-900">ระบบบริหารร้านนวด</span>
+      <span className="text-sm font-semibold text-gray-900">{dict.brand.name}</span>
     </div>
   );
 }
 
 export function DashboardShell({
   user,
+  languageSwitcher,
   children,
 }: {
   user: { name: string; role: string };
+  languageSwitcher: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
+  const { dict, locale } = useTranslation();
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
+
+  const roleLabel = user.role === "OWNER" ? dict.role.OWNER : dict.role.STAFF;
+  const dateFormat = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <div className="min-h-screen bg-background lg:flex">
@@ -86,7 +100,7 @@ export function DashboardShell({
           type="button"
           onClick={() => setDrawerOpen(true)}
           className="flex items-center justify-center gap-3 border-b border-border px-3 py-3 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-          aria-label="เปิดเมนู"
+          aria-label={dict.common.openMenu}
         >
           <NavIcon name="menu" className="h-5 w-5" />
         </button>
@@ -97,7 +111,7 @@ export function DashboardShell({
               <Link
                 key={item.href}
                 href={item.href}
-                title={item.label}
+                title={dict.nav[item.labelKey]}
                 aria-current={active ? "page" : undefined}
                 className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
                   active ? "bg-primary-light text-primary" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
@@ -124,7 +138,7 @@ export function DashboardShell({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                aria-label="ปิดเมนู"
+                aria-label={dict.common.closeMenu}
                 className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100"
               >
                 <NavIcon name="close" className="h-5 w-5" />
@@ -142,17 +156,15 @@ export function DashboardShell({
             type="button"
             onClick={() => setDrawerOpen(true)}
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 md:hidden"
-            aria-label="เปิดเมนู"
+            aria-label={dict.common.openMenu}
           >
             <NavIcon name="menu" className="h-5.5 w-5.5" />
           </button>
 
-          <span className="hidden text-sm font-medium text-gray-500 md:block">
-            {new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(
-              new Date()
-            )}
-          </span>
+          <span className="hidden text-sm font-medium text-gray-500 md:block">{dateFormat.format(new Date())}</span>
 
+          <div className="flex flex-1 items-center justify-end gap-3">
+          {languageSwitcher}
           <DropdownMenu
             align="end"
             trigger={({ open }) => (
@@ -167,7 +179,7 @@ export function DashboardShell({
                 <span className="hidden text-left sm:block">
                   <span className="block text-sm font-medium leading-tight text-gray-900">{user.name}</span>
                   <span className="block text-xs leading-tight text-text-secondary">
-                    {user.role === "OWNER" ? "เจ้าของร้าน" : "พนักงาน"}
+                    {roleLabel}
                   </span>
                 </span>
                 <NavIcon name="chevronDown" className="hidden h-4 w-4 text-gray-400 sm:block" />
@@ -176,7 +188,7 @@ export function DashboardShell({
           >
             <div className="border-b border-border px-3 py-2 sm:hidden">
               <p className="text-sm font-medium text-gray-900">{user.name}</p>
-              <p className="text-xs text-text-secondary">{user.role === "OWNER" ? "เจ้าของร้าน" : "พนักงาน"}</p>
+              <p className="text-xs text-text-secondary">{roleLabel}</p>
             </div>
             <div className="p-1">
               <DropdownItem
@@ -184,10 +196,11 @@ export function DashboardShell({
                 onClick={() => signOut({ callbackUrl: "/" })}
               >
                 <NavIcon name="logout" className="h-4 w-4" />
-                ออกจากระบบ
+                {dict.common.signOut}
               </DropdownItem>
             </div>
           </DropdownMenu>
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>

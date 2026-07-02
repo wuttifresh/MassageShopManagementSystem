@@ -5,6 +5,7 @@ import { Modal } from "./modal";
 import { Button } from "./button";
 import { Textarea } from "./input";
 import { Field } from "./field";
+import { useTranslation } from "@/i18n/locale-provider";
 
 export function ConfirmDialog({
   open,
@@ -12,12 +13,12 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = "ยืนยัน",
-  cancelLabel = "ยกเลิก",
+  confirmLabel,
+  cancelLabel,
   variant = "danger",
   isLoading,
   requireReason,
-  reasonLabel = "เหตุผล",
+  reasonLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,24 +32,25 @@ export function ConfirmDialog({
   requireReason?: boolean;
   reasonLabel?: string;
 }) {
+  const { dict } = useTranslation();
   const [reason, setReason] = useState("");
 
   return (
     <Modal open={open} onClose={onClose} title={title} description={description}>
       {requireReason && (
-        <Field label={reasonLabel} required className="mb-4">
+        <Field label={reasonLabel ?? dict.common.reason} required className="mb-4">
           <Textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            placeholder="ระบุเหตุผล..."
+            placeholder={dict.common.reasonPlaceholder}
             autoFocus
           />
         </Field>
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-          {cancelLabel}
+          {cancelLabel ?? dict.common.cancel}
         </Button>
         <Button
           type="button"
@@ -57,7 +59,7 @@ export function ConfirmDialog({
           disabled={requireReason && !reason.trim()}
           onClick={() => onConfirm(requireReason ? reason.trim() : undefined)}
         >
-          {confirmLabel}
+          {confirmLabel ?? dict.common.confirm}
         </Button>
       </div>
     </Modal>

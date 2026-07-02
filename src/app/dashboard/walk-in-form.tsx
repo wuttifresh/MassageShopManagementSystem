@@ -6,12 +6,14 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
+import { useTranslation } from "@/i18n/locale-provider";
 
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string };
 
 export function WalkInForm({ branchId }: { branchId: string }) {
+  const { dict } = useTranslation();
   const { showToast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -44,7 +46,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
     e.preventDefault();
     setError(null);
     if (!serviceOptionId) {
-      setError("กรุณาเลือกบริการ");
+      setError(dict.walkIn.pleaseSelectService);
       return;
     }
 
@@ -63,7 +65,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
       return;
     }
 
-    showToast({ variant: "success", title: "เพิ่มคิวสำเร็จ" });
+    showToast({ variant: "success", title: dict.dashboard.addWalkInSuccess });
     setGuestName("");
     setGuestPhone("");
     setServiceId("");
@@ -77,13 +79,13 @@ export function WalkInForm({ branchId }: { branchId: string }) {
         <Input
           value={guestName}
           onChange={(e) => setGuestName(e.target.value)}
-          placeholder="ชื่อลูกค้า"
+          placeholder={dict.walkIn.guestName}
           required
         />
         <Input
           value={guestPhone}
           onChange={(e) => setGuestPhone(e.target.value)}
-          placeholder="เบอร์โทร (ไม่บังคับ)"
+          placeholder={dict.walkIn.guestPhone}
         />
       </div>
 
@@ -95,7 +97,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
         }}
         required
       >
-        <option value="">เลือกบริการ</option>
+        <option value="">{dict.walkIn.selectService}</option>
         {services.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
@@ -105,10 +107,11 @@ export function WalkInForm({ branchId }: { branchId: string }) {
 
       {selectedService && (
         <Select value={serviceOptionId} onChange={(e) => setServiceOptionId(e.target.value)} required>
-          <option value="">เลือกระยะเวลา</option>
+          <option value="">{dict.walkIn.selectDuration}</option>
           {selectedService.options.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.durationMinutes} นาที ({o.promoPrice ? `฿${o.promoPrice} ปกติ ฿${o.price}` : `฿${o.price}`})
+              {o.durationMinutes} {dict.dashboard.minutesSuffix} (
+              {o.promoPrice ? `฿${o.promoPrice} ${dict.book.summary.normalPricePrefix} ฿${o.price}` : `฿${o.price}`})
             </option>
           ))}
         </Select>
@@ -116,7 +119,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
 
       {serviceId && (
         <Select value={therapistId} onChange={(e) => setTherapistId(e.target.value)}>
-          <option value="">คนไหนก็ได้ (มอบหมายทีหลัง)</option>
+          <option value="">{dict.walkIn.anyTherapistAssignLater}</option>
           {therapists.map((t) => (
             <option key={t.id} value={t.id}>
               {t.nickname}
@@ -128,7 +131,7 @@ export function WalkInForm({ branchId }: { branchId: string }) {
       {error && <Alert variant="danger">{error}</Alert>}
 
       <Button type="submit" variant="secondary" isLoading={isSubmitting} fullWidth>
-        + เพิ่มคิว
+        {dict.walkIn.submit}
       </Button>
     </form>
   );
