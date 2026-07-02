@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { rescheduleBooking } from "@/app/account/actions";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/cn";
+import { useTranslation } from "@/i18n/locale-provider";
 
 const DAY_COUNT = 14;
-const WEEKDAY_FORMAT = new Intl.DateTimeFormat("th-TH", { weekday: "short", timeZone: "UTC" });
-const DAY_FORMAT = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" });
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -34,6 +33,16 @@ export function ReschedulePicker({
   therapistId: string | null;
 }) {
   const router = useRouter();
+  const { dict, locale } = useTranslation();
+  const intlLocale = locale === "th" ? "th-TH" : "en-US";
+  const weekdayFormat = useMemo(
+    () => new Intl.DateTimeFormat(intlLocale, { weekday: "short", timeZone: "UTC" }),
+    [intlLocale]
+  );
+  const dayFormat = useMemo(
+    () => new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "short", timeZone: "UTC" }),
+    [intlLocale]
+  );
   const days = useMemo(() => nextDays(DAY_COUNT), []);
 
   const [date, setDate] = useState<string | null>(null);
@@ -88,8 +97,8 @@ export function ReschedulePicker({
                 selected ? "border-primary bg-primary text-white shadow-soft" : "border-border bg-card text-gray-700 hover:border-primary/40"
               )}
             >
-              <span>{WEEKDAY_FORMAT.format(d)}</span>
-              <span className="font-medium">{DAY_FORMAT.format(d)}</span>
+              <span>{weekdayFormat.format(d)}</span>
+              <span className="font-medium">{dayFormat.format(d)}</span>
             </button>
           );
         })}
@@ -98,9 +107,7 @@ export function ReschedulePicker({
       {date && (
         <div className="grid grid-cols-3 gap-2">
           {slots.length === 0 && (
-            <p className="col-span-3 text-center text-sm text-text-secondary">
-              ไม่มีคิวว่างในวันนี้ ลองเลือกวันอื่นดูนะคะ
-            </p>
+            <p className="col-span-3 text-center text-sm text-text-secondary">{dict.book.noSlotsToday}</p>
           )}
           {slots.map((slot) => (
             <button

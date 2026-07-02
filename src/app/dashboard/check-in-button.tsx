@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { checkInBooking } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
+import { useTranslation } from "@/i18n/locale-provider";
 
 type TherapistOption = { id: string; nickname: string; busy: boolean };
 
@@ -16,6 +17,7 @@ export function CheckInButton({
   therapistOptions: TherapistOption[];
   initialTherapistId?: string | null;
 }) {
+  const { dict } = useTranslation();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [therapistId, setTherapistId] = useState(initialTherapistId ?? "");
@@ -36,22 +38,22 @@ export function CheckInButton({
             value={therapistId}
             onChange={(e) => setTherapistId(e.target.value)}
             className="w-full py-2 text-xs sm:w-40"
-            aria-label="เลือกหมอนวด"
+            aria-label={dict.walkIn.selectTherapist}
           >
-            <option value="">มอบหมายทีหลัง</option>
+            <option value="">{dict.dashboard.assignLater}</option>
             {therapistOptions.map((t) => (
               <option key={t.id} value={t.id} disabled={t.busy}>
-                {t.nickname} {t.busy ? "(กำลังนวดอยู่)" : ""}
+                {t.nickname} {t.busy ? dict.queue.busySuffix : ""}
               </option>
             ))}
           </Select>
         ) : (
           <span className="flex-1 self-center text-xs text-text-secondary sm:flex-none">
-            ยังไม่มีหมอนวดพร้อมทำงาน
+            {dict.dashboard.noActiveTherapistShort}
           </span>
         )}
         <Button type="button" size="sm" variant="secondary" isLoading={isPending} onClick={handleClick}>
-          เช็คอิน
+          {dict.dashboard.checkIn}
         </Button>
       </div>
       {error && <p className="text-xs font-medium text-danger">{error}</p>}

@@ -12,6 +12,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getLocale } from "@/i18n/get-locale";
+import { getDictionary } from "@/i18n/get-dictionary";
 
 export default async function DashboardPage({
   searchParams,
@@ -29,13 +31,15 @@ export default async function DashboardPage({
   });
 
   const activeBranchId = await resolveActiveBranchId(session.user, searchParams.branchId);
+  const locale = getLocale();
+  const dict = getDictionary(locale);
 
   if (!activeBranchId) {
     return (
       <EmptyState
         icon="🏢"
-        title="ยังไม่มีสาขาที่ใช้งานอยู่"
-        description="กรุณาติดต่อผู้ดูแลระบบ"
+        title={dict.dashboard.noBranch}
+        description={dict.dashboard.noBranchHint}
         className="mt-10"
       />
     );
@@ -83,8 +87,8 @@ export default async function DashboardPage({
       <QueueRealtimeListener branchId={activeBranchId} />
 
       <PageHeader
-        title="แดชบอร์ดคิว"
-        description="ภาพรวมคิวและการเช็คอินของวันนี้"
+        title={dict.dashboard.title}
+        description={dict.dashboard.description}
         actions={
           session.user.role === "OWNER" ? (
             <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />
@@ -96,11 +100,11 @@ export default async function DashboardPage({
         <div className="flex flex-col gap-5 lg:col-span-2">
           <Card>
             <CardHeader
-              title="รอเช็คอิน"
+              title={dict.dashboard.waitingCheckIn}
               action={<Badge variant="warning">{checkInCandidates.length}</Badge>}
             />
             {checkInCandidates.length === 0 ? (
-              <EmptyState icon="🗓️" title="ไม่มีการจองที่รอเช็คอินวันนี้" />
+              <EmptyState icon="🗓️" title={dict.dashboard.noWaitingCheckIn} />
             ) : (
               <div className="flex flex-col gap-2.5">
                 {checkInCandidates.map((booking) => (
@@ -110,16 +114,17 @@ export default async function DashboardPage({
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-gray-900">
-                        {booking.customer?.name ?? booking.guestName ?? "ลูกค้า"} ·{" "}
+                        {booking.customer?.name ?? booking.guestName ?? dict.common.customerFallback} ·{" "}
                         {booking.serviceOption.service.name}
                       </p>
                       <p className="text-text-secondary">
-                        {new Intl.DateTimeFormat("th-TH", {
+                        {new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
                           timeZone: "UTC",
-                        }).format(booking.startTime)}{" "}
-                        น. · หมอนวด {booking.therapist?.nickname ?? "คนไหนก็ได้"}
+                        }).format(booking.startTime)}
+                        {dict.dashboard.timeSuffix} · {dict.dashboard.therapistPrefix}{" "}
+                        {booking.therapist?.nickname ?? dict.dashboard.anyTherapist}
                       </p>
                     </div>
                     <CheckInButton
@@ -134,9 +139,9 @@ export default async function DashboardPage({
           </Card>
 
           <Card>
-            <CardHeader title="คิววันนี้" action={<Badge variant="info">{queues.length}</Badge>} />
+            <CardHeader title={dict.dashboard.todayQueue} action={<Badge variant="info">{queues.length}</Badge>} />
             {queues.length === 0 ? (
-              <EmptyState icon="🛌" title="ยังไม่มีคิววันนี้" />
+              <EmptyState icon="🛌" title={dict.dashboard.noTodayQueue} />
             ) : (
               <div className="flex flex-col gap-2.5">
                 {queues.map((queue) => (
@@ -149,7 +154,7 @@ export default async function DashboardPage({
 
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-20">
-            <CardHeader title="เพิ่มคิว walk-in" />
+            <CardHeader title={dict.dashboard.addWalkIn} />
             <WalkInForm branchId={activeBranchId} />
           </Card>
         </div>

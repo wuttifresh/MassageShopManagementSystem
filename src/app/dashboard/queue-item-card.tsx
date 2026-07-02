@@ -5,6 +5,7 @@ import { assignTherapist, cancelQueue, completeService, startService } from "./a
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Select, Input } from "@/components/ui/input";
+import { useTranslation } from "@/i18n/locale-provider";
 
 type TherapistOption = { id: string; nickname: string; busy: boolean };
 
@@ -18,14 +19,6 @@ type QueueItem = {
   customer: { name: string } | null;
   guestName: string | null;
   serviceOption: { durationMinutes: number; service: { name: string } };
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  WAITING: "รอมอบหมาย",
-  ASSIGNED: "มอบหมายแล้ว",
-  IN_PROGRESS: "กำลังนวด",
-  DONE: "เสร็จแล้ว",
-  CANCELLED: "ยกเลิกแล้ว",
 };
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
@@ -43,12 +36,14 @@ export function QueueItemCard({
   queue: QueueItem;
   therapistOptions: TherapistOption[];
 }) {
+  const { dict } = useTranslation();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickedTherapistId, setPickedTherapistId] = useState(queue.therapistId ?? "");
   const [bedLabel, setBedLabel] = useState(queue.bedLabel ?? "");
 
   const isActive = queue.status === "WAITING" || queue.status === "ASSIGNED" || queue.status === "IN_PROGRESS";
+  const statusLabel = dict.queueStatus[queue.status as keyof typeof dict.queueStatus] ?? queue.status;
 
   function run(action: () => Promise<{ success: boolean; error?: string }>) {
     setError(null);
@@ -62,13 +57,13 @@ export function QueueItemCard({
     <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-gray-50/60 p-3.5 text-sm transition-colors hover:border-gray-300">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium text-gray-900">
-          {queue.queueNumber} · {queue.customer?.name ?? queue.guestName ?? "ลูกค้า"}
+          {queue.queueNumber} · {queue.customer?.name ?? queue.guestName ?? dict.common.customerFallback}
         </span>
-        <Badge variant={STATUS_BADGE[queue.status] ?? "neutral"}>{STATUS_LABEL[queue.status] ?? queue.status}</Badge>
+        <Badge variant={STATUS_BADGE[queue.status] ?? "neutral"}>{statusLabel}</Badge>
       </div>
       <p className="text-text-secondary">
-        {queue.serviceOption.service.name} ({queue.serviceOption.durationMinutes} นาที)
-        {queue.bedLabel ? ` · เตียง ${queue.bedLabel}` : ""}
+        {queue.serviceOption.service.name} ({queue.serviceOption.durationMinutes} {dict.dashboard.minutesSuffix})
+        {queue.bedLabel ? ` · ${dict.queue.bedPlaceholder} ${queue.bedLabel}` : ""}
       </p>
 
       {queue.status === "WAITING" && (
@@ -79,10 +74,10 @@ export function QueueItemCard({
               onChange={(e) => setPickedTherapistId(e.target.value)}
               className="flex-1 bg-card"
             >
-              <option value="">เลือกหมอนวด</option>
+              <option value="">{dict.walkIn.selectTherapist}</option>
               {therapistOptions.map((t) => (
                 <option key={t.id} value={t.id} disabled={t.busy}>
-                  {t.nickname} {t.busy ? "(กำลังนวดอยู่)" : ""}
+                  {t.nickname} {t.busy ? dict.queue.busySuffix : ""}
                 </option>
               ))}
             </Select>
@@ -93,12 +88,12 @@ export function QueueItemCard({
               isLoading={isPending}
               onClick={() => run(() => assignTherapist(queue.id, pickedTherapistId))}
             >
-              มอบหมาย
+              {dict.queue.assign}
             </Button>
           </div>
         ) : (
           <p className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 text-text-secondary">
-            ยังไม่มีหมอนวดพร้อมทำงานในสาขานี้ — เพิ่มหมอนวดหรือตั้งสถานะ &quot;พร้อมทำงาน&quot; ก่อน
+            {dict.dashboard.noActiveTherapist}
           </p>
         )
       )}
@@ -106,16 +101,16 @@ export function QueueItemCard({
       {queue.status === "ASSIGNED" && (
         <div className="flex flex-col gap-2 sm:flex-row">
           <span className="flex flex-1 items-center rounded-xl border border-border bg-card px-3.5 py-2.5 text-text-secondary">
-            หมอนวด: {queue.therapist?.nickname}
+            {dict.dashboard.therapistPrefix}: {queue.therapist?.nickname}
           </span>
           <Input
             value={bedLabel}
             onChange={(e) => setBedLabel(e.target.value)}
-            placeholder="เตียง"
+            placeholder={dict.queue.bedPlaceholder}
             className="sm:w-24"
           />
           <Button type="button" variant="secondary" isLoading={isPending} onClick={() => run(() => startService(queue.id, bedLabel))}>
-            เริ่มนวด
+            {dict.queue.startService}
           </Button>
         </div>
       )}
@@ -123,10 +118,10 @@ export function QueueItemCard({
       {queue.status === "IN_PROGRESS" && (
         <div className="flex flex-col gap-2 sm:flex-row">
           <span className="flex flex-1 items-center rounded-xl border border-border bg-card px-3.5 py-2.5 text-text-secondary">
-            หมอนวด: {queue.therapist?.nickname}
+            {dict.dashboard.therapistPrefix}: {queue.therapist?.nickname}
           </span>
           <Button type="button" variant="success" isLoading={isPending} onClick={() => run(() => completeService(queue.id))}>
-            เช็คเอาท์ (เสร็จ)
+            {dict.queue.checkout}
           </Button>
         </div>
       )}
@@ -138,7 +133,7 @@ export function QueueItemCard({
           onClick={() => run(() => cancelQueue(queue.id))}
           className="self-start text-xs font-medium text-danger transition-colors hover:text-danger-hover disabled:opacity-50"
         >
-          ยกเลิกคิว
+          {dict.queue.cancelQueue}
         </button>
       )}
 

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
+import { useTranslation } from "@/i18n/locale-provider";
+import type { Dictionary } from "@/i18n/get-dictionary";
 
 type Branch = { id: string; name: string; slug: string; address: string | null };
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
@@ -16,8 +18,6 @@ type Therapist = { id: string; nickname: string; bio: string | null };
 type Step = "branch" | "service" | "duration" | "therapist" | "datetime" | "confirm" | "done";
 
 const DAY_COUNT = 14;
-const WEEKDAY_FORMAT = new Intl.DateTimeFormat("th-TH", { weekday: "short", timeZone: "UTC" });
-const DAY_FORMAT = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" });
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -31,6 +31,16 @@ function nextDays(count: number): Date[] {
 
 export function BookingWizard() {
   const router = useRouter();
+  const { dict, locale } = useTranslation();
+  const intlLocale = locale === "th" ? "th-TH" : "en-US";
+  const weekdayFormat = useMemo(
+    () => new Intl.DateTimeFormat(intlLocale, { weekday: "short", timeZone: "UTC" }),
+    [intlLocale]
+  );
+  const dayFormat = useMemo(
+    () => new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "short", timeZone: "UTC" }),
+    [intlLocale]
+  );
 
   const [step, setStep] = useState<Step>("branch");
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -130,10 +140,10 @@ export function BookingWizard() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
         </div>
-        <p className="text-lg font-semibold text-success-hover">จองคิวสำเร็จ!</p>
-        <p className="text-sm text-gray-600">เจอกันที่ร้านตามเวลาที่จองไว้นะคะ</p>
+        <p className="text-lg font-semibold text-success-hover">{dict.book.successTitle}</p>
+        <p className="text-sm text-gray-600">{dict.book.successDescription}</p>
         <Button type="button" onClick={() => router.push("/account")}>
-          ดูการจองของฉัน
+          {dict.book.viewMyBookings}
         </Button>
       </div>
     );
@@ -141,7 +151,7 @@ export function BookingWizard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Breadcrumb step={step} />
+      <Breadcrumb step={step} dict={dict} />
 
       {step === "branch" && (
         <StepList
@@ -168,8 +178,10 @@ export function BookingWizard() {
         <StepList
           items={selectedService.options.map((o) => ({
             id: o.id,
-            label: `${o.durationMinutes} นาที`,
-            sub: o.promoPrice ? `฿${o.promoPrice} (ปกติ ฿${o.price})` : `฿${o.price}`,
+            label: `${o.durationMinutes} ${dict.dashboard.minutesSuffix}`,
+            sub: o.promoPrice
+              ? `฿${o.promoPrice} (${dict.book.summary.normalPricePrefix} ฿${o.price})`
+              : `฿${o.price}`,
           }))}
           onSelect={(id) => {
             setServiceOptionId(id);
@@ -181,7 +193,7 @@ export function BookingWizard() {
       {step === "therapist" && (
         <StepList
           items={[
-            { id: "ANY", label: "คนไหนก็ได้", sub: "ระบบจะเลือกหมอนวดที่ว่างให้อัตโนมัติ" },
+            { id: "ANY", label: dict.book.anyTherapistLabel, sub: dict.book.anyTherapistHint },
             ...therapists.map((t) => ({ id: t.id, label: t.nickname, sub: t.bio ?? undefined })),
           ]}
           onSelect={(id) => {
@@ -207,8 +219,8 @@ export function BookingWizard() {
                     selected ? "border-primary bg-primary text-white shadow-soft" : "border-border bg-card text-gray-700 hover:border-primary/40"
                   )}
                 >
-                  <span>{WEEKDAY_FORMAT.format(d)}</span>
-                  <span className="font-medium">{DAY_FORMAT.format(d)}</span>
+                  <span>{weekdayFormat.format(d)}</span>
+                  <span className="font-medium">{dayFormat.format(d)}</span>
                 </button>
               );
             })}
@@ -217,9 +229,7 @@ export function BookingWizard() {
           {date && (
             <div className="grid grid-cols-3 gap-2">
               {slots.length === 0 && (
-                <p className="col-span-3 text-center text-sm text-text-secondary">
-                  ไม่มีคิวว่างในวันนี้ ลองเลือกวันอื่นดูนะคะ
-                </p>
+                <p className="col-span-3 text-center text-sm text-text-secondary">{dict.book.noSlotsToday}</p>
               )}
               {slots.map((slot) => (
                 <button
@@ -242,16 +252,22 @@ export function BookingWizard() {
       {step === "confirm" && selectedBranch && selectedService && selectedOption && date && time && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 text-sm shadow-card">
-            <Row label="สาขา" value={selectedBranch.name} />
-            <Row label="บริการ" value={`${selectedService.name} (${selectedOption.durationMinutes} นาที)`} />
-            <Row label="หมอนวด" value={selectedTherapist ? selectedTherapist.nickname : "คนไหนก็ได้"} />
-            <Row label="วันที่" value={DAY_FORMAT.format(new Date(date))} />
-            <Row label="เวลา" value={time} />
+            <Row label={dict.book.summary.branch} value={selectedBranch.name} />
             <Row
-              label="ราคา"
+              label={dict.book.summary.service}
+              value={`${selectedService.name} (${selectedOption.durationMinutes} ${dict.dashboard.minutesSuffix})`}
+            />
+            <Row
+              label={dict.book.summary.therapist}
+              value={selectedTherapist ? selectedTherapist.nickname : dict.book.anyTherapistLabel}
+            />
+            <Row label={dict.book.summary.date} value={dayFormat.format(new Date(date))} />
+            <Row label={dict.book.summary.time} value={time} />
+            <Row
+              label={dict.book.summary.price}
               value={
                 selectedOption.promoPrice
-                  ? `฿${selectedOption.promoPrice} (ปกติ ฿${selectedOption.price})`
+                  ? `฿${selectedOption.promoPrice} (${dict.book.summary.normalPricePrefix} ฿${selectedOption.price})`
                   : `฿${selectedOption.price}`
               }
             />
@@ -260,7 +276,7 @@ export function BookingWizard() {
           {error && <Alert variant="danger">{error}</Alert>}
 
           <Button type="button" size="lg" isLoading={isLoading} onClick={handleConfirm} fullWidth>
-            ยืนยันการจอง
+            {dict.book.confirmBooking}
           </Button>
         </div>
       )}
@@ -274,7 +290,7 @@ export function BookingWizard() {
           <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
           </svg>
-          ย้อนกลับ
+          {dict.book.back}
         </button>
       )}
     </div>
@@ -298,16 +314,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const STEP_ORDER: Step[] = ["branch", "service", "duration", "therapist", "datetime", "confirm"];
 
-function Breadcrumb({ step }: { step: Step }) {
-  const labels: Record<Step, string> = {
-    branch: "เลือกสาขา",
-    service: "เลือกบริการ",
-    duration: "เลือกระยะเวลา",
-    therapist: "เลือกหมอนวด",
-    datetime: "เลือกวัน-เวลา",
-    confirm: "ยืนยันการจอง",
-    done: "เสร็จสิ้น",
-  };
+function Breadcrumb({ step, dict }: { step: Step; dict: Dictionary }) {
   const currentIndex = STEP_ORDER.indexOf(step);
 
   return (
@@ -324,7 +331,7 @@ function Breadcrumb({ step }: { step: Step }) {
         ))}
       </div>
       <p className="text-sm font-medium text-text-secondary">
-        ขั้นตอน {currentIndex + 1}/{STEP_ORDER.length} · {labels[step]}
+        {dict.book.stepPrefix} {currentIndex + 1}/{STEP_ORDER.length} · {dict.book.steps[step]}
       </p>
     </div>
   );

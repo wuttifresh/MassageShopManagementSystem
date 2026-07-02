@@ -1,4 +1,5 @@
 import { getCurrentSession } from "@/lib/session";
+import { LanguageSwitcher } from "@/i18n/language-switcher";
 import { DashboardShell } from "./dashboard-shell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <DashboardShell user={{ name: session.user.name ?? "", role: session.user.role }}>
+    <DashboardShell
+      user={{ name: session.user.name ?? "", role: session.user.role }}
+      languageSwitcher={<LanguageSwitcher />}
+    >
       {children}
     </DashboardShell>
   );

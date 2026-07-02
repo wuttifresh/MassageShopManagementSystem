@@ -6,8 +6,10 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { useTranslation } from "@/i18n/locale-provider";
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
+  const { dict } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
     setIsSubmitting(false);
 
     if (!result || result.error) {
-      setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+      setError(dict.login.error);
       return;
     }
 
@@ -38,29 +40,29 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   return (
     <div className="flex w-full max-w-sm flex-col gap-6 rounded-2xl border border-border bg-card p-6 shadow-card">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Field label="อีเมล (เจ้าของ/พนักงาน/หมอนวด)" required>
+        <Field label={dict.login.emailLabel} required>
           <Input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="staff@massageshop.test"
+            placeholder={dict.login.emailPlaceholder}
           />
         </Field>
-        <Field label="รหัสผ่าน" required>
+        <Field label={dict.login.passwordLabel} required>
           <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
 
         {error && <Alert variant="danger">{error}</Alert>}
 
         <Button type="submit" isLoading={isSubmitting} fullWidth>
-          เข้าสู่ระบบ
+          {dict.login.submit}
         </Button>
       </form>
 
       <div className="flex items-center gap-3 text-xs text-gray-400">
         <span className="h-px flex-1 bg-border" />
-        หรือ
+        {dict.login.or}
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -69,7 +71,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
         onClick={() => signIn("line", { callbackUrl })}
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#06C755] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
       >
-        เข้าสู่ระบบด้วย LINE (ลูกค้า)
+        {dict.login.lineLogin}
       </button>
     </div>
   );
