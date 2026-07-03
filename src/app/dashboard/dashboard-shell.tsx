@@ -84,13 +84,13 @@ export function DashboardShell({
   return (
     <div className="min-h-screen bg-background lg:flex">
       {/* Desktop fixed sidebar */}
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card xl:w-72">
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card xl:w-72 print:hidden">
         <Brand />
         <NavLinks role={user.role} />
       </aside>
 
       {/* Tablet collapsible rail: icons only, expands to drawer on tap */}
-      <aside className="hidden md:flex md:w-[72px] md:shrink-0 md:flex-col md:border-r md:border-border md:bg-card lg:hidden">
+      <aside className="hidden md:flex md:w-[72px] md:shrink-0 md:flex-col md:border-r md:border-border md:bg-card lg:hidden print:hidden">
         <div className="flex h-16 items-center justify-center border-b border-border">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-soft">
             <NavIcon name="sparkles" className="h-5 w-5" />
@@ -126,7 +126,7 @@ export function DashboardShell({
 
       {/* Mobile drawer */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 md:hidden print:hidden">
           <div
             className="absolute inset-0 animate-fade-in bg-gray-900/50"
             onClick={() => setDrawerOpen(false)}
@@ -151,7 +151,7 @@ export function DashboardShell({
 
       <div className="flex min-h-screen flex-1 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/95 px-4 backdrop-blur sm:px-6 print:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -203,7 +203,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 print:p-0">{children}</main>
       </div>
     </div>
   );
