@@ -65,7 +65,7 @@ export function ServiceOptionRow({
           type="checkbox"
           checked={values.isActive}
           onChange={(e) => setValues((v) => ({ ...v, isActive: e.target.checked }))}
-          className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
+          className="h-[18px] w-[18px] rounded border-border text-primary focus:ring-primary/30"
         />
         เปิดขายตัวเลือกนี้
       </label>

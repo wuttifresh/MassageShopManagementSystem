@@ -55,7 +55,7 @@ export function EditStaffForm({
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
-          className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
+          className="h-[18px] w-[18px] rounded border-border text-primary focus:ring-primary/30"
         />
         บัญชีนี้ใช้งานได้ (ปิดไว้ = ล็อกอินไม่ได้)
       </label>
