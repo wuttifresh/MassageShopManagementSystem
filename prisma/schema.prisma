@@ -146,6 +146,12 @@ enum AuditAction {
   RESCHEDULE_BOOKING
   REDEEM_PACKAGE
   ADJUST_POINTS
+  /// An outbound customer notification (booking confirmation, pre-appointment reminder, or the
+  /// "start a booking" prompt sent from a channel webhook) — see multi-channel-booking-prompt.md,
+  /// Phase 5. Reuses AuditLog rather than a new table: `metadata` carries {channel, notificationType,
+  /// recipient, status, error}, and `entityId` is the bookingId when there is one, else the raw
+  /// channelUserId/wa_id (AuditLog.entityId is a free-text string, not an enforced FK).
+  SEND_NOTIFICATION
 
   @@map("audit_action")
 }

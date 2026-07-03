@@ -3,13 +3,40 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
 import { getSalesReport } from "@/lib/reports";
+import { getBookingChannelReport, type BookingChannelKey } from "@/lib/booking-channel-report";
 import { ReportFilterForm } from "./report-filter-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { ResponsiveTable } from "@/components/ui/table";
+import { ResponsiveTable, type Column } from "@/components/ui/table";
 import { LinkButton } from "@/components/ui/link-button";
 import { EmptyState } from "@/components/ui/empty-state";
+
+const CHANNEL_LABEL: Record<BookingChannelKey, string> = {
+  LINE: "LINE",
+  WHATSAPP: "WhatsApp",
+  ONLINE: "เว็บไซต์",
+  WALK_IN: "หน้าร้าน",
+  PHONE: "โทรศัพท์",
+  ADMIN: "แอดมิน",
+};
+
+/// Builds one table column per channel that actually has bookings somewhere in the selected
+/// range, plus a trailing "รวม" (total) column — so the table never shows an all-zero column for
+/// a channel this shop doesn't use, but stays consistent across every row.
+function channelColumns<T extends { counts: Record<BookingChannelKey, number>; total: number }>(
+  presentChannels: BookingChannelKey[]
+): Column<T>[] {
+  return [
+    ...presentChannels.map((channel) => ({
+      key: channel,
+      header: CHANNEL_LABEL[channel],
+      align: "right" as const,
+      cell: (row: T) => row.counts[channel],
+    })),
+    { key: "total", header: "รวม", align: "right" as const, cell: (row: T) => row.total, emphasize: true },
+  ];
+}
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -23,6 +50,7 @@ function defaultDateRange(): { startDate: string; endDate: string } {
 
 const NUMBER_FORMAT = new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const DAY_FORMAT = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" });
+const MONTH_FORMAT = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "UTC" });
 
 export default async function ReportsPage({
   searchParams,
@@ -48,11 +76,14 @@ export default async function ReportsPage({
   const startDate = searchParams.startDate ?? defaults.startDate;
   const endDate = searchParams.endDate ?? defaults.endDate;
 
-  const report = await getSalesReport({
-    branchId: activeBranchId,
-    startDate: new Date(startDate),
-    endDate: new Date(new Date(endDate).getTime() + 86_400_000),
-  });
+  const rangeStart = new Date(startDate);
+  const rangeEnd = new Date(new Date(endDate).getTime() + 86_400_000);
+
+  const [report, channelReport] = await Promise.all([
+    getSalesReport({ branchId: activeBranchId, startDate: rangeStart, endDate: rangeEnd }),
+    getBookingChannelReport({ branchId: activeBranchId, startDate: rangeStart, endDate: rangeEnd }),
+  ]);
+  const presentChannels = channelReport.byChannel.map((row) => row.channel);
 
   const exportUrl = `/api/reports/export?branchId=${activeBranchId}&startDate=${startDate}&endDate=${endDate}`;
 
@@ -124,6 +155,32 @@ export default async function ReportsPage({
             { key: "date", header: "วันที่", cell: (row) => DAY_FORMAT.format(new Date(row.date)), emphasize: true },
             { key: "count", header: "จำนวนบิล", align: "right", cell: (row) => row.transactionCount },
             { key: "revenue", header: "ยอดขาย", align: "right", cell: (row) => `฿${NUMBER_FORMAT.format(row.revenue)}` },
+          ]}
+        />
+      </Card>
+
+      <Card>
+        <CardHeader title="สัดส่วนการจองตามช่องทาง — รายวัน" />
+        <ResponsiveTable
+          rowKey={(row) => row.date}
+          rows={channelReport.byDay}
+          emptyMessage="ไม่มีการจองในช่วงเวลานี้"
+          columns={[
+            { key: "date", header: "วันที่", cell: (row) => DAY_FORMAT.format(new Date(row.date)), emphasize: true },
+            ...channelColumns(presentChannels),
+          ]}
+        />
+      </Card>
+
+      <Card>
+        <CardHeader title="สัดส่วนการจองตามช่องทาง — รายเดือน" />
+        <ResponsiveTable
+          rowKey={(row) => row.month}
+          rows={channelReport.byMonth}
+          emptyMessage="ไม่มีการจองในช่วงเวลานี้"
+          columns={[
+            { key: "month", header: "เดือน", cell: (row) => MONTH_FORMAT.format(new Date(`${row.month}-01`)), emphasize: true },
+            ...channelColumns(presentChannels),
           ]}
         />
       </Card>
