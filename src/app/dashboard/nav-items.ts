@@ -13,6 +13,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: "home" },
   { href: "/dashboard/pos", labelKey: "pos", icon: "pos" },
+  { href: "/dashboard/bookings", labelKey: "bookings", icon: "calendar" },
   { href: "/dashboard/customers", labelKey: "customers", icon: "users" },
   { href: "/dashboard/therapists", labelKey: "therapists", icon: "sparkles" },
   { href: "/dashboard/services", labelKey: "services", icon: "tag" },
