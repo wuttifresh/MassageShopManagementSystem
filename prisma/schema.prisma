@@ -123,6 +123,16 @@ enum MembershipTier {
   @@map("membership_tier")
 }
 
+/// Multi-channel booking entry points (see multi-channel-booking-prompt.md). Distinct from
+/// `BookingSource`, which is coarser (ONLINE/WALK_IN/PHONE/ADMIN) and predates this feature —
+/// `channel` narrows "ONLINE" down to which surface the customer actually used.
+enum Channel {
+  LINE
+  WHATSAPP
+
+  @@map("channel")
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -178,6 +188,35 @@ model User {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+/// Customer identity for the *new* multi-channel booking entry points (LINE LIFF, WhatsApp
+/// Flows) — see multi-channel-booking-prompt.md. Kept deliberately separate from `User`:
+/// existing customers who sign in via LINE Login on the web already exist as
+/// `User(role: CUSTOMER, lineUserId: ...)`, and migrating that live data onto a new table was
+/// judged too risky to do blindly. So there are two customer identity sources side by side:
+///   - `User(role: CUSTOMER)` — web customers via NextAuth LINE Login (existing, unchanged).
+///   - `Customer` — LIFF/WhatsApp customers, upserted by `(channel, channelUserId)` (new).
+/// A `Booking` may reference at most one of `customerId` (User) / `channelCustomerId` (Customer).
+model Customer {
+  id String @id @default(cuid())
+
+  channel       Channel
+  /// LINE: the `sub` claim from the verified ID token (== LINE userId).
+  /// WhatsApp: the customer's wa_id (phone-number-scoped WhatsApp identifier).
+  channelUserId String  @map("channel_user_id")
+
+  name  String
+  phone String?
+
+  bookings Booking[] @relation("BookingChannelCustomer")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([channel, channelUserId])
+  @@map("customers")
 }
 
 /// A physical shop location. All operational data (bookings, queue, transactions) is scoped here.
@@ -347,6 +386,17 @@ model Booking {
   customer   User?   @relation("BookingCustomer", fields: [customerId], references: [id], onDelete: SetNull)
   guestName  String? @map("guest_name")
   guestPhone String? @map("guest_phone")
+
+  /// Set only for bookings made through the new multi-channel entry points (LIFF/WhatsApp) —
+  /// mutually exclusive with `customerId`. See the `Customer` model doc comment.
+  channelCustomerId String?   @map("channel_customer_id")
+  channelCustomer   Customer? @relation("BookingChannelCustomer", fields: [channelCustomerId], references: [id], onDelete: SetNull)
+  /// Which multi-channel surface created this booking. Null for bookings predating this feature
+  /// or made through existing paths (web, walk-in, phone, admin) — see the `Channel` enum doc.
+  channel           Channel?
+  /// Short customer-facing booking reference, e.g. "BK-4F2A". Null for bookings predating this
+  /// feature; always set for new multi-channel bookings.
+  code              String?   @unique
 
   serviceOptionId String        @map("service_option_id")
   serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
