@@ -1,0 +1,274 @@
+{
+  "version": "7.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SELECT_BRANCH": ["SELECT_SERVICE"],
+    "SELECT_SERVICE": ["SELECT_DATETIME"],
+    "SELECT_DATETIME": ["CONFIRM"],
+    "CONFIRM": ["SUCCESS"]
+  },
+  "screens": [
+    {
+      "id": "SELECT_BRANCH",
+      "title": "เลือกสาขา",
+      "data": {
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" } }
+          }
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_select_branch",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "เลือกสาขาที่ต้องการใช้บริการ"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "branch_id",
+                "label": "สาขา",
+                "required": true,
+                "data-source": "${data.branches}"
+              },
+              {
+                "type": "Footer",
+                "label": "ถัดไป",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": { "branch_id": "${form.branch_id}" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SELECT_SERVICE",
+      "title": "เลือกบริการ",
+      "data": {
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "state_token": { "type": "string" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_select_service",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "state_token",
+                "label": "state_token",
+                "input-type": "text",
+                "visible": false,
+                "init-value": "${data.state_token}"
+              },
+              {
+                "type": "TextHeading",
+                "text": "เลือกบริการที่ต้องการ"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "service_option_id",
+                "label": "บริการ",
+                "required": true,
+                "data-source": "${data.services}"
+              },
+              {
+                "type": "Footer",
+                "label": "ถัดไป",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "state_token": "${form.state_token}",
+                    "service_option_id": "${form.service_option_id}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SELECT_DATETIME",
+      "title": "เลือกวันและเวลา",
+      "data": {
+        "min_date": { "type": "string" },
+        "max_date": { "type": "string" },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "string" }, "title": { "type": "string" } }
+          }
+        },
+        "state_token": { "type": "string" },
+        "error_message": { "type": "string" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_select_datetime",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "state_token",
+                "label": "state_token",
+                "input-type": "text",
+                "visible": false,
+                "init-value": "${data.state_token}"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}"
+              },
+              {
+                "type": "DatePicker",
+                "name": "date",
+                "label": "วันที่",
+                "required": true,
+                "min-date": "${data.min_date}",
+                "max-date": "${data.max_date}",
+                "on-select-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "state_token": "${form.state_token}",
+                    "date": "${form.date}"
+                  }
+                }
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "time",
+                "label": "เวลาที่ว่าง",
+                "required": true,
+                "data-source": "${data.slots}"
+              },
+              {
+                "type": "Footer",
+                "label": "ถัดไป",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "state_token": "${form.state_token}",
+                    "date": "${form.date}",
+                    "time": "${form.time}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM",
+      "title": "ยืนยันการจอง",
+      "data": {
+        "summary_branch": { "type": "string" },
+        "summary_service": { "type": "string" },
+        "summary_date": { "type": "string" },
+        "summary_time": { "type": "string" },
+        "state_token": { "type": "string" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_confirm",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "state_token",
+                "label": "state_token",
+                "input-type": "text",
+                "visible": false,
+                "init-value": "${data.state_token}"
+              },
+              { "type": "TextHeading", "text": "ตรวจสอบรายละเอียดการจอง" },
+              { "type": "TextBody", "text": "สาขา: ${data.summary_branch}" },
+              { "type": "TextBody", "text": "บริการ: ${data.summary_service}" },
+              { "type": "TextBody", "text": "วันที่: ${data.summary_date}" },
+              { "type": "TextBody", "text": "เวลา: ${data.summary_time}" },
+              {
+                "type": "TextInput",
+                "name": "name",
+                "label": "ชื่อผู้จอง",
+                "input-type": "text",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "ยืนยันการจอง",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "state_token": "${form.state_token}",
+                    "name": "${form.name}",
+                    "time": "${data.summary_time}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "จองสำเร็จ",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "booking_code": { "type": "string" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_success",
+            "children": [
+              { "type": "TextHeading", "text": "จองคิวสำเร็จ!" },
+              { "type": "TextBody", "text": "รหัสการจองของคุณคือ ${data.booking_code}" },
+              { "type": "TextBody", "text": "เจอกันที่ร้านตามเวลาที่จองไว้นะคะ" },
+              {
+                "type": "Footer",
+                "label": "เสร็จสิ้น",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": { "booking_code": "${data.booking_code}" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
