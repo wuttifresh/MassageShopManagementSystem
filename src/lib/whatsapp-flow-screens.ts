@@ -1,4 +1,5 @@
 import { BookingSource } from "@/generated/prisma/client";
+import { notifyChannelBookingConfirmed } from "@/lib/booking-notifications";
 import {
   BookingValidationError,
   Channel,
@@ -7,6 +8,7 @@ import {
   getAvailableSlots,
   getBranches,
   getServices,
+  type BookingCustomerIdentity,
 } from "@/lib/booking-service";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { signPayload, verifyPayload } from "@/lib/whatsapp-flow-token";
@@ -29,6 +31,12 @@ type FlowState = {
   branchId?: string;
   serviceOptionId?: string;
   date?: string;
+  /// Set once, at the SELECT_DATETIME -> CONFIRM transition (where branch/service are already
+  /// fetched for the summary screen) so CONFIRM's booking-confirmation notification doesn't need
+  /// a second round-trip to look up display names.
+  branchName?: string;
+  serviceName?: string;
+  durationMinutes?: number;
 };
 
 type FlowIdentity = { waId: string };
@@ -187,7 +195,14 @@ async function routeDataExchange(request: FlowActionRequest, identity: FlowIdent
           summary_service: `${serviceOption.serviceName} (${serviceOption.durationMinutes} นาที)`,
           summary_date: data.date,
           summary_time: data.time,
-          state_token: signState({ branchId: state.branchId, serviceOptionId: state.serviceOptionId, date: data.date }),
+          state_token: signState({
+            branchId: state.branchId,
+            serviceOptionId: state.serviceOptionId,
+            date: data.date,
+            branchName: branch.name,
+            serviceName: serviceOption.serviceName,
+            durationMinutes: serviceOption.durationMinutes,
+          }),
         },
       };
     }
@@ -206,6 +221,12 @@ async function routeDataExchange(request: FlowActionRequest, identity: FlowIdent
       }
 
       try {
+        const customer: BookingCustomerIdentity = {
+          type: "channel",
+          channel: Channel.WHATSAPP,
+          channelUserId: identity.waId,
+          name: data.name,
+        };
         const booking = await createBooking({
           branchId: state.branchId,
           serviceOptionId: state.serviceOptionId,
@@ -213,8 +234,16 @@ async function routeDataExchange(request: FlowActionRequest, identity: FlowIdent
           date: state.date,
           time: data.time,
           source: BookingSource.ONLINE,
-          customer: { type: "channel", channel: Channel.WHATSAPP, channelUserId: identity.waId, name: data.name },
+          customer,
         });
+
+        if (state.branchName && state.serviceName && state.durationMinutes) {
+          await notifyChannelBookingConfirmed(booking, customer, {
+            branchName: state.branchName,
+            serviceName: state.serviceName,
+            durationMinutes: state.durationMinutes,
+          });
+        }
 
         return { screen: "SUCCESS", data: { booking_code: booking.code ?? "" } };
       } catch (error) {

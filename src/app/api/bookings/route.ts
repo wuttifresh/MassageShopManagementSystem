@@ -3,6 +3,7 @@ import { BookingSource, Role } from "@/generated/prisma/client";
 import { getCurrentSession } from "@/lib/session";
 import { verifyLineIdToken } from "@/lib/line-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { notifyChannelBookingConfirmed } from "@/lib/booking-notifications";
 import {
   BookingValidationError,
   Channel,
@@ -172,6 +173,19 @@ export async function POST(request: Request) {
       source: BookingSource.ONLINE,
       customer,
     });
+
+    const [branches, services] = await Promise.all([getBranches(), getServices()]);
+    const branch = branches.find((b) => b.id === body.branchId);
+    const serviceOption = services
+      .flatMap((s) => s.options.map((o) => ({ ...o, serviceName: s.name })))
+      .find((o) => o.id === body.serviceOptionId);
+    if (branch && serviceOption) {
+      await notifyChannelBookingConfirmed(booking, customer, {
+        branchName: branch.name,
+        serviceName: serviceOption.serviceName,
+        durationMinutes: serviceOption.durationMinutes,
+      });
+    }
 
     return NextResponse.json(
       { bookingId: booking.id, code: booking.code, startTime: booking.startTime, endTime: booking.endTime },
