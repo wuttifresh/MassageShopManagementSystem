@@ -34,6 +34,7 @@ const en: Dictionary = {
   nav: {
     dashboard: "Queue dashboard",
     pos: "POS / Checkout",
+    bookings: "Bookings",
     customers: "Customers",
     therapists: "Therapists",
     services: "Services",

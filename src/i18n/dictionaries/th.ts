@@ -32,6 +32,7 @@ const th = {
   nav: {
     dashboard: "แดชบอร์ดคิว",
     pos: "POS / ชำระเงิน",
+    bookings: "รายการจอง",
     customers: "ลูกค้า",
     therapists: "จัดการหมอนวด",
     services: "จัดการบริการ",
