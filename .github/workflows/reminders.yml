@@ -18,3 +18,12 @@ jobs:
           curl --fail --silent --show-error \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.APP_URL }}/api/cron/reminders"
+      # Separate 2-hour-ahead reminder for multi-channel (LINE LIFF / WhatsApp) bookings — see
+      # src/app/api/cron/channel-reminders/route.ts (multi-channel-booking-prompt.md, Phase 5).
+      # Kept as its own endpoint/step rather than merged into the call above since the two have
+      # different lead times and target different customer-identity tables.
+      - name: Call channel reminder endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/channel-reminders"

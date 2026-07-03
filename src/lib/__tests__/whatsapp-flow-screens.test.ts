@@ -3,11 +3,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // Fully self-contained mock (no importOriginal) — booking-service.ts's own dependency chain
 // (@/lib/prisma, @/lib/availability) isn't something this suite wants to exercise for real; it
 // only needs to verify the screen router's own branching, state-token trust, and error mapping.
-const { getBranches, getServices, getAvailableSlots, createBooking } = vi.hoisted(() => ({
+const { getBranches, getServices, getAvailableSlots, createBooking, logNotification } = vi.hoisted(() => ({
   getBranches: vi.fn(),
   getServices: vi.fn(),
   getAvailableSlots: vi.fn(),
   createBooking: vi.fn(),
+  logNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/booking-service", () => {
@@ -25,6 +26,11 @@ vi.mock("@/lib/booking-service", () => {
     createBooking,
   };
 });
+
+// booking-notifications.ts (imported by whatsapp-flow-screens.ts) pulls in notification-log.ts,
+// which pulls in @/lib/prisma (a real PrismaClient instantiation) — mock it here purely to keep
+// this suite's module graph free of that, same reasoning as the booking-service mock above.
+vi.mock("@/lib/notification-log", () => ({ logNotification }));
 
 import { SlotTakenError, BookingValidationError } from "@/lib/booking-service";
 import { __resetRateLimitsForTests } from "@/lib/rate-limit";
@@ -55,6 +61,7 @@ beforeEach(() => {
   getServices.mockReset().mockResolvedValue(SERVICES);
   getAvailableSlots.mockReset().mockResolvedValue([]);
   createBooking.mockReset();
+  logNotification.mockReset();
   __resetRateLimitsForTests();
   process.env.WA_FLOW_TOKEN_SECRET = SECRET;
 });
@@ -179,7 +186,14 @@ describe("routeFlowAction — SELECT_DATETIME", () => {
 });
 
 describe("routeFlowAction — CONFIRM", () => {
-  const state = { branchId: "branch-1", serviceOptionId: "so-1", date: "2026-01-01" };
+  const state = {
+    branchId: "branch-1",
+    serviceOptionId: "so-1",
+    date: "2026-01-01",
+    branchName: "สาขาสยาม",
+    serviceName: "นวดไทย",
+    durationMinutes: 60,
+  };
 
   it("requires a name", async () => {
     await expect(
@@ -212,6 +226,9 @@ describe("routeFlowAction — CONFIRM", () => {
       })
     );
     expect(result).toEqual({ screen: "SUCCESS", data: { booking_code: "BK-ABCD" } });
+    expect(logNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: "WHATSAPP", type: "BOOKING_CONFIRMATION", recipient: "66899998888", bookingId: "b-1" })
+    );
   });
 
   it("bounces back to SELECT_DATETIME with an error message when the slot was just taken", async () => {
