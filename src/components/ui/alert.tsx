@@ -40,7 +40,7 @@ export function Alert({
         className
       )}
     >
-      <svg className="mt-0.5 h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" fill="none" aria-hidden="true">
+      <svg className="mt-0.5 h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" fill="none" aria-hidden="true">
         {ICONS[variant]}
       </svg>
       <div className="min-w-0">

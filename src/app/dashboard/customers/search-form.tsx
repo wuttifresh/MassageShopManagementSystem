@@ -18,7 +18,7 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
     <form onSubmit={handleSubmit} className="flex gap-2">
       <div className="relative flex-1">
         <svg
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400"
+          className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

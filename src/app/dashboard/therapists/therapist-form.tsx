@@ -132,7 +132,7 @@ export function TherapistForm({
                 type="checkbox"
                 checked={values.specialtyServiceIds.includes(s.id)}
                 onChange={() => toggleSpecialty(s.id)}
-                className="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/30"
+                className="h-[18px] w-[18px] rounded border-border text-primary focus:ring-primary/30"
               />
               {s.name}
             </label>

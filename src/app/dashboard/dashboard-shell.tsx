@@ -158,7 +158,7 @@ export function DashboardShell({
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 md:hidden"
             aria-label={dict.common.openMenu}
           >
-            <NavIcon name="menu" className="h-5.5 w-5.5" />
+            <NavIcon name="menu" className="h-[22px] w-[22px]" />
           </button>
 
           <span className="hidden text-sm font-medium text-gray-500 md:block">{dateFormat.format(new Date())}</span>
