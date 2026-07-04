@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { BOOKING_CHANNEL_KEYS, type BookingChannelKey } from "@/lib/booking-channel";
 
-/// A booking's *display* channel: `channel` (LINE/WHATSAPP) when set by the multi-channel entry
-/// points (multi-channel-booking-prompt.md, Phases 2-4), else falls back to `source`
-/// (ONLINE/WALK_IN/PHONE/ADMIN) for bookings made through the pre-existing paths — see the
-/// `Channel` enum's doc comment in schema.prisma for why these are two separate fields.
-export const BOOKING_CHANNEL_KEYS = ["LINE", "WHATSAPP", "ONLINE", "WALK_IN", "PHONE", "ADMIN"] as const;
-export type BookingChannelKey = (typeof BOOKING_CHANNEL_KEYS)[number];
+export { BOOKING_CHANNEL_KEYS, type BookingChannelKey };
 
 export type ChannelCountRow = { channel: BookingChannelKey; count: number };
 export type DailyChannelRow = { date: string; counts: Record<BookingChannelKey, number>; total: number };
