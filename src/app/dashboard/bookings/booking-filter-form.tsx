@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Field } from "@/components/ui/field";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BOOKING_CHANNEL_KEYS, type BookingChannelKey } from "@/lib/booking-channel-report";
+import { BOOKING_CHANNEL_KEYS, type BookingChannelKey } from "@/lib/booking-channel";
 
 type Branch = { id: string; name: string };
 
