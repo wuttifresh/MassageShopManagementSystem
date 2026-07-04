@@ -82,7 +82,7 @@ export function DashboardShell({
   });
 
   return (
-    <div className="min-h-screen bg-background lg:flex">
+    <div className="min-h-screen bg-background md:flex">
       {/* Desktop fixed sidebar */}
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-card xl:w-72 print:hidden">
         <Brand />
