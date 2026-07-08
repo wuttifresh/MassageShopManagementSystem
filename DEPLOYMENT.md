@@ -82,10 +82,16 @@ https://developers.line.biz/console/:
 `Authorization: Bearer $CRON_SECRET` (ดู `src/lib/cron-auth.ts`) — ถ้าไม่ตั้ง `CRON_SECRET`
 endpoint จะเปิดสาธารณะ **ห้ามปล่อยแบบนั้นใน production**
 
-- **`/api/cron/daily-summary`** (สรุปยอดขายให้เจ้าของ, ควรรันวันละครั้ง) — ตั้งค่าไว้แล้วใน
-  `vercel.json` (`30 15 * * *` = 22:30 เวลาไทย หลังร้านปิดตามเวลาเริ่มต้น) Vercel จะเติม header
-  `Authorization: Bearer $CRON_SECRET` ให้เองถ้าตั้งชื่อ env var ตรงกับ `CRON_SECRET` พอดี — ไม่ต้อง
-  ทำอะไรเพิ่ม แค่ตั้ง env var นี้ไว้ใน Vercel เท่านั้น
+- **`/api/cron/daily-summary`** (สรุปยอดขายให้เจ้าของ, ควรรันวันละครั้ง) — Vercel Cron ถูกปิดไว้
+  (ลบ `crons` ออกจาก `vercel.json` แล้ว) หากต้องการเปิดใช้อีกครั้ง ให้เพิ่มกลับเข้าไปใน
+  `vercel.json`:
+  ```json
+  {
+    "crons": [{ "path": "/api/cron/daily-summary", "schedule": "30 15 * * *" }]
+  }
+  ```
+  (`30 15 * * *` = 22:30 เวลาไทย หลังร้านปิดตามเวลาเริ่มต้น) Vercel จะเติม header
+  `Authorization: Bearer $CRON_SECRET` ให้เองถ้าตั้งชื่อ env var ตรงกับ `CRON_SECRET` พอดี
 - **`/api/cron/reminders`** (เตือนลูกค้าก่อนถึงคิว, ต้องรันถี่ทุก ~10 นาที) — **Vercel Cron บน
   Hobby plan รันได้แค่วันละครั้งเป็นอย่างน้อย** ถี่กว่านี้ต้อง upgrade เป็น Pro ($20/เดือน ซึ่งเกิน
   งบเป้าหมาย) จึงใช้ **GitHub Actions scheduled workflow** แทน (ฟรี, ไม่จำกัดความถี่จริงจัง) ไฟล์
