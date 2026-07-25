@@ -235,6 +235,10 @@ const th = {
     refCode: "รหัสอ้างอิง",
     retry: "ลองใหม่",
   },
+  channelDisabled: {
+    title: "ขณะนี้จองผ่านช่องทางนี้ไม่ได้",
+    description: "ตอนนี้ร้านรับจองคิวผ่าน WhatsApp เท่านั้น กรุณาทักไปที่ WhatsApp ของร้านเพื่อทำการจอง",
+  },
 };
 
 export default th;

@@ -237,6 +237,10 @@ const en: Dictionary = {
     refCode: "Reference code",
     retry: "Try again",
   },
+  channelDisabled: {
+    title: "Booking isn't available here right now",
+    description: "We're currently taking bookings via WhatsApp only. Please message us on WhatsApp to book.",
+  },
 };
 
 export default en;
