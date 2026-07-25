@@ -37,9 +37,11 @@ const th = {
     customers: "ลูกค้า",
     therapists: "จัดการหมอนวด",
     services: "จัดการบริการ",
+    products: "สินค้า Add-on",
     reports: "รายงาน",
     branches: "จัดการสาขา",
     staff: "พนักงาน",
+    vouchers: "รหัสส่วนลด",
   },
   home: {
     title: "ระบบบริหารร้านนวด",

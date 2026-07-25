@@ -18,7 +18,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/customers", labelKey: "customers", icon: "users" },
   { href: "/dashboard/therapists", labelKey: "therapists", icon: "sparkles" },
   { href: "/dashboard/services", labelKey: "services", icon: "tag" },
+  { href: "/dashboard/products", labelKey: "products", icon: "box" },
   { href: "/dashboard/reports", labelKey: "reports", icon: "chart" },
   { href: "/dashboard/branches", labelKey: "branches", icon: "building", ownerOnly: true },
   { href: "/dashboard/staff", labelKey: "staff", icon: "id", ownerOnly: true },
+  { href: "/dashboard/vouchers", labelKey: "vouchers", icon: "ticket", ownerOnly: true },
 ];

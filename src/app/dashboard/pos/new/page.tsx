@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { resolveActiveBranchId } from "@/lib/branch-scope";
-import { Checkout, type PrefillLineItem } from "./checkout";
+import { Checkout, type PrefillLineItem, type BranchProduct } from "./checkout";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -67,6 +67,17 @@ export default async function NewSalePage({
     return <EmptyState icon="🏢" title="ยังไม่มีสาขาที่ใช้งานอยู่" className="mt-10" />;
   }
 
+  const productRows = await prisma.product.findMany({
+    where: { branchId, isActive: true, deletedAt: null },
+    orderBy: { name: "asc" },
+  });
+  const products: BranchProduct[] = productRows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price.toString(),
+    stockQuantity: p.stockQuantity,
+  }));
+
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-5">
       <PageHeader backHref="/dashboard/pos" title="ขายใหม่" />
@@ -76,6 +87,7 @@ export default async function NewSalePage({
           queueId={queueId}
           prefillItem={prefillItem}
           customerPackages={customerPackages}
+          products={products}
         />
       </Card>
     </div>
