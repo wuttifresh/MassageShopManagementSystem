@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import { Channel } from "@/lib/booking-service";
+import { getBookingLinkText, messageTriggersBooking } from "@/lib/channel-booking-adapter";
 import { logNotification } from "@/lib/notification-log";
-import { sendWhatsAppFlowMessage } from "@/lib/whatsapp-messaging";
-import { signPayload } from "@/lib/whatsapp-flow-token";
+import { sendWhatsAppTextMessage } from "@/lib/whatsapp-messaging";
 import { verifyWhatsAppWebhookSignature } from "@/lib/whatsapp-webhook-auth";
 
-// Verifies an HMAC signature and mints signed flow_tokens (node:crypto) — never edge (coding rule #7).
+// Verifies an HMAC signature (node:crypto) — never edge (coding rule #7).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Generous enough to outlive how long a customer takes to work through the Flow (Phase 4's own
-// intra-flow state_token uses 15 minutes; this is the outer session envelope around that).
-const FLOW_TOKEN_TTL_MS = 30 * 60_000;
 
 type WhatsAppWebhookPayload = {
   entry?: Array<{
     changes?: Array<{
-      value?: { messages?: Array<{ from?: string; type?: string }> };
+      value?: { messages?: Array<{ from?: string; type?: string; text?: { body?: string } }> };
     }>;
   }>;
 };
@@ -40,6 +36,15 @@ export async function GET(request: Request) {
   return new NextResponse(null, { status: 403 });
 }
 
+/// Phase 3 (channel adapter): a customer texting "จอง" gets a plain-text reply with the /book-now
+/// link (src/lib/channel-booking-adapter.ts) — free-form text is deliverable here because it's a
+/// direct reply within the 24-hour session window the customer's own inbound message just opened,
+/// unlike the OTP/reminder cases elsewhere in this codebase that have to use approved templates.
+///
+/// This replaces the previous behavior of sending the WhatsApp Flow invite (sendWhatsAppFlowMessage)
+/// on every inbound message — the Flow endpoint itself (src/app/api/whatsapp/flow, whatsapp-flow-screens.ts)
+/// is untouched and still works if invited some other way; wiring Flows through services/booking-core
+/// instead of calling booking-service.ts's createBooking directly is the deferred next step.
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
@@ -58,27 +63,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const tokenSecret = process.env.WA_FLOW_TOKEN_SECRET;
-  const flowId = process.env.WA_FLOW_ID;
-
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       for (const message of change.value?.messages ?? []) {
-        if (!message.from || !tokenSecret || !flowId) continue;
+        if (!message.from || message.type !== "text" || !messageTriggersBooking(message.text?.body)) continue;
 
-        // The wa_id is trusted here because it comes from Meta's HMAC-signature-verified webhook
-        // body (coding rule #5) — never something accepted from an unauthenticated request. We
-        // sign it into the flow_token ourselves so the Flow endpoint (Phase 4) can later verify
-        // whoever completes the Flow really is this same conversation.
-        const flowToken = signPayload({ waId: message.from }, tokenSecret, FLOW_TOKEN_TTL_MS);
-        const result = await sendWhatsAppFlowMessage(message.from, flowId, flowToken);
-
-        await logNotification({ channel: Channel.WHATSAPP, type: "FLOW_INVITE", recipient: message.from, result });
+        const result = await sendWhatsAppTextMessage(message.from, getBookingLinkText());
+        await logNotification({ channel: Channel.WHATSAPP, type: "BOOKING_LINK", recipient: message.from, result });
       }
     }
   }
 
   // Meta expects a fast 200 ack regardless of per-message outcomes — retrying the whole delivery
-  // on a partial failure would just re-send the Flow invite to customers who already got it.
+  // on a partial failure would just re-send the booking link to customers who already got it.
   return NextResponse.json({ ok: true });
 }

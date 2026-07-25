@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Channel } from "@/lib/booking-service";
+import { getBookingLinkUrl, messageTriggersBooking } from "@/lib/channel-booking-adapter";
 import { sendLineReplyMessage } from "@/lib/line-messaging";
 import { verifyLineWebhookSignature } from "@/lib/line-webhook-auth";
 import { logNotification } from "@/lib/notification-log";
@@ -7,8 +8,6 @@ import { logNotification } from "@/lib/notification-log";
 // Verifies an HMAC signature (node:crypto) — never edge (coding rule #7).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const BOOKING_KEYWORD = "จอง";
 
 type LineWebhookEvent = {
   type: string;
@@ -23,12 +22,14 @@ function isLineWebhookPayload(value: unknown): value is LineWebhookPayload {
   return typeof value === "object" && value !== null;
 }
 
-/// The "start a booking" Flex Message with a button that opens the LIFF page (Phase 3) — sent in
-/// reply whenever a customer texts something containing "จอง" (multi-channel-booking-prompt.md,
-/// Phase 5: 'ลูกค้าพิมพ์ "จอง" -> ตอบ Flex Message พร้อมปุ่มเปิด LIFF').
+/// The "start a booking" Flex Message, sent in reply whenever a customer texts something
+/// containing "จอง" — points at /book-now (src/lib/channel-booking-adapter.ts, Phase 3), the
+/// same link the WhatsApp webhook sends. Previously pointed at the LIFF booking page
+/// (`https://liff.line.me/${NEXT_PUBLIC_LIFF_ID}`), which has been non-functional since LINE
+/// Login/the /account portal were retired (see src/middleware.ts) — /book-now works for a LINE
+/// user the same as anyone else, since it needs no account, just a phone number.
 function buildBookingFlexMessage() {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-  const liffUrl = liffId ? `https://liff.line.me/${liffId}` : "https://liff.line.me/";
+  const url = getBookingLinkUrl();
 
   return {
     type: "flex",
@@ -53,7 +54,7 @@ function buildBookingFlexMessage() {
       footer: {
         type: "box",
         layout: "vertical",
-        contents: [{ type: "button", style: "primary", action: { type: "uri", label: "จองคิวเลย", uri: liffUrl } }],
+        contents: [{ type: "button", style: "primary", action: { type: "uri", label: "จองคิวเลย", uri: url } }],
       },
     },
   };
@@ -79,12 +80,12 @@ export async function POST(request: Request) {
 
   for (const event of payload.events ?? []) {
     if (event.type !== "message" || event.message?.type !== "text" || !event.replyToken) continue;
-    if (!event.message.text?.includes(BOOKING_KEYWORD)) continue;
+    if (!messageTriggersBooking(event.message.text)) continue;
 
     const result = await sendLineReplyMessage(event.replyToken, [buildBookingFlexMessage()]);
     await logNotification({
       channel: Channel.LINE,
-      type: "FLOW_INVITE",
+      type: "BOOKING_LINK",
       recipient: event.source?.userId ?? "unknown",
       result,
     });

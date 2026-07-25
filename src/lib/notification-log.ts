@@ -3,7 +3,7 @@ import type { Channel } from "@/lib/booking-service";
 import { prisma } from "@/lib/prisma";
 import type { SendResult } from "@/lib/send-result";
 
-export type NotificationType = "BOOKING_CONFIRMATION" | "BOOKING_REMINDER" | "FLOW_INVITE";
+export type NotificationType = "BOOKING_CONFIRMATION" | "BOOKING_REMINDER" | "FLOW_INVITE" | "BOOKING_LINK";
 
 export type NotificationLogInput = {
   channel: Channel;
