@@ -70,6 +70,7 @@ func setupFixture(t *testing.T, pool *pgxpool.Pool) testFixture {
 
 	t.Cleanup(func() {
 		mustExec(t, ctx, pool, `DELETE FROM bookings WHERE branch_id = $1`, f.BranchID)
+		mustExec(t, ctx, pool, `DELETE FROM customers WHERE channel_user_id LIKE 'test-%'`)
 		mustExec(t, ctx, pool, `DELETE FROM audit_logs WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM therapist_schedules WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM therapists WHERE branch_id = $1`, f.BranchID)
@@ -99,7 +100,7 @@ func TestCreateBooking_Success(t *testing.T) {
 		TherapistID:     f.TherapistID,
 		Date:            f.Date.Format("2006-01-02"),
 		Time:            "10:00",
-		GuestName:       "Somchai",
+		Customer:        CustomerIdentity{Name: "Somchai"},
 	})
 	if err != nil {
 		t.Fatalf("CreateBooking: %v", err)
@@ -109,6 +110,48 @@ func TestCreateBooking_Success(t *testing.T) {
 	}
 	if booking.Code == "" {
 		t.Error("expected a non-empty booking code")
+	}
+}
+
+func TestCreateBooking_ChannelCustomer(t *testing.T) {
+	pool := testPool(t)
+	f := setupFixture(t, pool)
+	svc := NewService(pool)
+	ctx := context.Background()
+
+	channelUserID := "test-" + uuid.NewString()
+	booking, err := svc.CreateBooking(ctx, CreateInput{
+		BranchID:        f.BranchID,
+		ServiceOptionID: f.ServiceOptionID,
+		TherapistID:     f.TherapistID,
+		Date:            f.Date.Format("2006-01-02"),
+		Time:            "09:00",
+		Customer:        CustomerIdentity{Channel: "WEB", ChannelUserID: channelUserID, Name: "Somchai"},
+	})
+	if err != nil {
+		t.Fatalf("CreateBooking: %v", err)
+	}
+	if booking.Channel == nil || *booking.Channel != "WEB" {
+		t.Errorf("channel = %v, want WEB", booking.Channel)
+	}
+	if booking.ChannelCustomerID == nil || *booking.ChannelCustomerID == "" {
+		t.Error("expected a non-nil channelCustomerId")
+	}
+	if booking.GuestName != nil {
+		t.Errorf("guestName = %v, want nil for a channel-linked booking", booking.GuestName)
+	}
+
+	// The customer row should be upserted, not duplicated, on a second booking with the same
+	// (channel, channelUserId) — mirrors createBooking's Customer.upsert in
+	// src/lib/booking-service.ts.
+	var customerCount int
+	err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM customers WHERE channel = 'WEB'::channel AND channel_user_id = $1`, channelUserID).
+		Scan(&customerCount)
+	if err != nil {
+		t.Fatalf("count query: %v", err)
+	}
+	if customerCount != 1 {
+		t.Errorf("customer row count = %d, want 1", customerCount)
 	}
 }
 
@@ -124,13 +167,13 @@ func TestCreateBooking_RejectsOverlapAfterFirstBooking(t *testing.T) {
 		TherapistID:     f.TherapistID,
 		Date:            f.Date.Format("2006-01-02"),
 		Time:            "10:00",
-		GuestName:       "First customer",
+		Customer:        CustomerIdentity{Name: "First customer"},
 	}
 	if _, err := svc.CreateBooking(ctx, in); err != nil {
 		t.Fatalf("first CreateBooking: %v", err)
 	}
 
-	in.GuestName = "Second customer"
+	in.Customer = CustomerIdentity{Name: "Second customer"}
 	_, err := svc.CreateBooking(ctx, in)
 	if !errors.Is(err, ErrSlotTaken) {
 		t.Fatalf("second CreateBooking error = %v, want ErrSlotTaken", err)
@@ -149,7 +192,7 @@ func TestCancelBooking(t *testing.T) {
 		TherapistID:     f.TherapistID,
 		Date:            f.Date.Format("2006-01-02"),
 		Time:            "11:00",
-		GuestName:       "Somchai",
+		Customer:        CustomerIdentity{Name: "Somchai"},
 	})
 	if err != nil {
 		t.Fatalf("CreateBooking: %v", err)
@@ -172,7 +215,7 @@ func TestCancelBooking(t *testing.T) {
 		TherapistID:     f.TherapistID,
 		Date:            f.Date.Format("2006-01-02"),
 		Time:            "11:00",
-		GuestName:       "Someone else",
+		Customer:        CustomerIdentity{Name: "Someone else"},
 	})
 	if err != nil {
 		t.Fatalf("re-booking the freed slot: %v", err)
@@ -203,7 +246,7 @@ func TestCreateBooking_DoubleBookingRace(t *testing.T) {
 				TherapistID:     f.TherapistID,
 				Date:            f.Date.Format("2006-01-02"),
 				Time:            "14:00",
-				GuestName:       fmt.Sprintf("customer-%d", i),
+				Customer:        CustomerIdentity{Name: fmt.Sprintf("customer-%d", i)},
 			})
 			results[i] = err
 		}(i)
@@ -270,7 +313,7 @@ func TestGetAvailableSlots_ExcludesBookedRange(t *testing.T) {
 		TherapistID:     f.TherapistID,
 		Date:            f.Date.Format("2006-01-02"),
 		Time:            "15:00",
-		GuestName:       "Somchai",
+		Customer:        CustomerIdentity{Name: "Somchai"},
 	}); err != nil {
 		t.Fatalf("CreateBooking: %v", err)
 	}

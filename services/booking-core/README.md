@@ -5,18 +5,25 @@ booking, cancel booking — that reads and writes the **same Postgres database a
 existing Next.js/Prisma app uses (see `prisma/schema.prisma` at the repo root). It does not run
 its own migrations or own a separate schema.
 
-Not yet wired up to anything: nothing in the Next.js app or any channel adapter calls this service
-yet. Phase 2/3 will decide how the public booking page and WhatsApp/LINE adapters reach it
-(direct HTTP call from a Next.js route handler, or something else) — an open question, not
-resolved by this phase.
+**Phase 2 update**: `/book-now` (public web booking, no login) now calls this service for
+availability + create, via `src/lib/booking-core-client.ts` proxied through
+`/api/book-now/availability` and `/api/book-now/bookings` — `BOOKING_CORE_URL` in `.env.example`.
+Cancel/reschedule/lookup for `/book-now` still go through the TypeScript `booking-service.ts`
+directly (unchanged) — only availability + create moved. LINE/WhatsApp channel adapters (Phase 3)
+are still not wired up.
 
 ## Endpoints
 
 - `GET /v1/availability?branchId=&serviceOptionId=&date=&therapistId=` — `therapistId` omitted =
   union of every eligible therapist's free slots ("คนไหนก็ได้").
-- `POST /v1/bookings` — `{branchId, serviceOptionId, therapistId, date, time, guestName, guestPhone,
-  source}`. `therapistId` empty = pick any available therapist. Returns 409 if the slot is taken,
-  400 on validation errors.
+- `POST /v1/bookings` — `{branchId, serviceOptionId, therapistId, date, time, source, channel,
+  channelUserId, guestName, guestPhone}`. `therapistId` empty = pick any available therapist.
+  `channel`+`channelUserId` set together upsert a `customers` row (channel, channel_user_id) and
+  link it via the booking's `channel_customer_id` — e.g. `/book-now` sends `channel: "WEB"`,
+  `channelUserId: <OTP-verified phone>` — matching how LINE/WhatsApp customers already work in
+  `src/lib/booking-service.ts`, so Phase 3's channel adapters can reuse this same endpoint instead
+  of a separate one. Both empty = the legacy `guest_name`/`guest_phone` path instead. Returns 409
+  if the slot is taken, 400 on validation errors.
 - `POST /v1/bookings/:id/cancel` — `{reason}`. 409 if the booking isn't in a cancellable state
   (PENDING/CONFIRMED), 404 if it doesn't exist.
 

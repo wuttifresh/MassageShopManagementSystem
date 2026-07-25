@@ -31,7 +31,17 @@ function nextDays(count: number): Date[] {
   return Array.from({ length: count }, (_, i) => new Date(base.getTime() + i * 86_400_000));
 }
 
-export function BookNowWizard() {
+export function BookNowWizard({
+  initialBranchSlug,
+  initialServiceOptionId,
+}: {
+  /// Preselects a branch by its stable `slug` (from a "ลิงก์ร้าน" share link) — skips the branch
+  /// step entirely once resolved. See /dashboard/booking-links.
+  initialBranchSlug?: string;
+  /// Preselects a service+duration by service option id (from a "ลิงก์เฉพาะ service/promo" share
+  /// link) — skips both the service and duration steps once resolved.
+  initialServiceOptionId?: string;
+}) {
   const { dict, locale } = useTranslation();
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
   const weekdayFormat = useMemo(
@@ -70,24 +80,52 @@ export function BookNowWizard() {
   const selectedBranch = branches.find((b) => b.id === branchId) ?? null;
   const selectedTherapist = therapists.find((t) => t.id === therapistId) ?? null;
 
+  // Loads branches + services up front (not gated on step) so a share link's `?branch=`/`?option=`
+  // can resolve and skip steps before the user ever sees them, instead of only after they'd
+  // normally have reached that step.
   useEffect(() => {
-    fetch("/api/branches")
-      .then((r) => r.json())
-      .then((data: { branches: Branch[] }) => {
-        setBranches(data.branches);
-        if (data.branches.length === 1) {
-          setBranchId(data.branches[0].id);
-          setStep("service");
-        }
-      });
-  }, []);
+    Promise.all([
+      fetch("/api/branches").then((r) => r.json()) as Promise<{ branches: Branch[] }>,
+      fetch("/api/services").then((r) => r.json()) as Promise<{ services: Service[] }>,
+    ]).then(([branchesData, servicesData]) => {
+      setBranches(branchesData.branches);
+      setServices(servicesData.services);
 
-  useEffect(() => {
-    if (step !== "service" || services.length > 0) return;
-    fetch("/api/services")
-      .then((r) => r.json())
-      .then((data: { services: Service[] }) => setServices(data.services));
-  }, [step, services.length]);
+      const matchedBranch = initialBranchSlug
+        ? branchesData.branches.find((b) => b.slug === initialBranchSlug)
+        : branchesData.branches.length === 1
+          ? branchesData.branches[0]
+          : null;
+
+      let matchedService: Service | null = null;
+      let matchedOption: ServiceOption | null = null;
+      if (initialServiceOptionId) {
+        for (const s of servicesData.services) {
+          const opt = s.options.find((o) => o.id === initialServiceOptionId);
+          if (opt) {
+            matchedService = s;
+            matchedOption = opt;
+            break;
+          }
+        }
+      }
+
+      if (matchedBranch) setBranchId(matchedBranch.id);
+      if (matchedService && matchedOption) {
+        setServiceId(matchedService.id);
+        setServiceOptionId(matchedOption.id);
+      }
+
+      if (matchedBranch && matchedService && matchedOption) {
+        setStep("therapist");
+      } else if (matchedBranch) {
+        setStep("service");
+      }
+    });
+    // Only ever runs once on mount — initialBranchSlug/initialServiceOptionId come from the URL
+    // and don't change during the wizard's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (step !== "therapist" || !branchId || !serviceId) return;
@@ -97,21 +135,17 @@ export function BookNowWizard() {
   }, [step, branchId, serviceId]);
 
   useEffect(() => {
-    if (step !== "datetime" || !branchId || !serviceId || !selectedOption || !date) return;
+    if (step !== "datetime" || !branchId || !serviceOptionId || !date) return;
     setSlots([]);
     setTime(null);
-    const params = new URLSearchParams({
-      branchId,
-      serviceId,
-      date,
-      durationMinutes: String(selectedOption.durationMinutes),
-    });
+    const params = new URLSearchParams({ branchId, serviceOptionId, date });
     if (therapistId && therapistId !== "ANY") params.set("therapistId", therapistId);
 
-    fetch(`/api/availability?${params.toString()}`)
+    // Queried live from services/booking-core (Go), not src/lib/availability.ts — see Phase 2.
+    fetch(`/api/book-now/availability?${params.toString()}`)
       .then((r) => r.json())
       .then((data: { slots: string[] }) => setSlots(data.slots));
-  }, [step, branchId, serviceId, selectedOption, therapistId, date]);
+  }, [step, branchId, serviceOptionId, date, therapistId]);
 
   async function handleSendOtp() {
     setIsLoading(true);

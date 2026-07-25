@@ -162,9 +162,8 @@ type CreateInput struct {
 	TherapistID string
 	Date        string // YYYY-MM-DD
 	Time        string // HH:mm
-	GuestName   string
-	GuestPhone  *string
 	Source      string
+	Customer    CustomerIdentity
 }
 
 // CreateBooking validates the request, resolves a concrete free therapist under a Postgres
@@ -172,6 +171,18 @@ type CreateInput struct {
 // transaction, retried on a booking-code collision. See the package doc comment for how this
 // relates to the EXCLUDE constraint.
 func (s *Service) CreateBooking(ctx context.Context, in CreateInput) (Booking, error) {
+	hasChannel := in.Customer.Channel != ""
+	hasChannelUserID := in.Customer.ChannelUserID != ""
+	if hasChannel != hasChannelUserID {
+		// Either both Channel and ChannelUserID are set (channel-linked customer) or neither is
+		// (legacy guest_name/guest_phone path) — a half-filled identity is a caller bug, not
+		// something to silently paper over.
+		return Booking{}, fmt.Errorf("%w: customer.channel and customer.channelUserID must be set together", ErrValidation)
+	}
+	if in.Customer.Channel == "" && in.Customer.Name == "" {
+		return Booking{}, fmt.Errorf("%w: customer name is required", ErrValidation)
+	}
+
 	date, err := time.ParseInLocation("2006-01-02", in.Date, time.UTC)
 	if err != nil {
 		return Booking{}, fmt.Errorf("%w: invalid date", ErrValidation)
@@ -281,17 +292,29 @@ func (s *Service) attemptCreate(ctx context.Context, in CreateInput, so ServiceO
 		source = "ONLINE"
 	}
 
-	created, err := insertBooking(ctx, tx, insertBookingParams{
+	params := insertBookingParams{
 		BranchID:        in.BranchID,
 		ServiceOptionID: in.ServiceOptionID,
 		TherapistID:     resolvedTherapistID,
-		GuestName:       in.GuestName,
-		GuestPhone:      in.GuestPhone,
 		Code:            code,
 		StartTime:       startTime,
 		EndTime:         endTime,
 		Source:          source,
-	})
+	}
+
+	if in.Customer.Channel != "" {
+		customerID, err := upsertChannelCustomer(ctx, tx, in.Customer.Channel, in.Customer.ChannelUserID, in.Customer.Name, in.Customer.Phone)
+		if err != nil {
+			return Booking{}, err
+		}
+		params.Channel = &in.Customer.Channel
+		params.ChannelCustomerID = &customerID
+	} else {
+		params.GuestName = &in.Customer.Name
+		params.GuestPhone = in.Customer.Phone
+	}
+
+	created, err := insertBooking(ctx, tx, params)
 	if err != nil {
 		if isExclusionViolation(err) {
 			return Booking{}, ErrSlotTaken
@@ -316,8 +339,6 @@ func (s *Service) attemptCreate(ctx context.Context, in CreateInput, so ServiceO
 
 	created.BranchID = in.BranchID
 	created.ServiceOptionID = in.ServiceOptionID
-	created.GuestName = in.GuestName
-	created.GuestPhone = in.GuestPhone
 	created.Source = source
 	return created, nil
 }

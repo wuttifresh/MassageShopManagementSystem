@@ -169,16 +169,37 @@ func lockTherapistForBooking(ctx context.Context, tx pgx.Tx, therapistID string)
 	return err
 }
 
+// upsertChannelCustomer inserts or updates a `customers` row keyed by (channel, channel_user_id)
+// — the same upsert-by-composite-key pattern src/lib/booking-service.ts's createBooking uses for
+// LINE/WhatsApp customers, now shared by the WEB channel (and, later, Phase 3's adapters) too.
+func upsertChannelCustomer(ctx context.Context, tx pgx.Tx, channel, channelUserID, name string, phone *string) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO customers (id, channel, channel_user_id, name, phone, created_at, updated_at)
+		VALUES (gen_random_uuid()::text, $1::channel, $2, $3, $4, now(), now())
+		ON CONFLICT (channel, channel_user_id)
+		DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, updated_at = now()
+		RETURNING id`,
+		channel, channelUserID, name, phone,
+	).Scan(&id)
+	return id, err
+}
+
 type insertBookingParams struct {
 	BranchID        string
 	ServiceOptionID string
 	TherapistID     string
-	GuestName       string
-	GuestPhone      *string
 	Code            string
 	StartTime       time.Time
 	EndTime         time.Time
 	Source          string
+
+	// Exactly one of (Channel + ChannelCustomerID) or (GuestName) is expected — see
+	// CustomerIdentity's doc comment for why the schema supports both shapes.
+	Channel           *string
+	ChannelCustomerID *string
+	GuestName         *string
+	GuestPhone        *string
 }
 
 func insertBooking(ctx context.Context, tx pgx.Tx, p insertBookingParams) (Booking, error) {
@@ -186,13 +207,17 @@ func insertBooking(ctx context.Context, tx pgx.Tx, p insertBookingParams) (Booki
 	b.TherapistID = &p.TherapistID
 	err := tx.QueryRow(ctx, `
 		INSERT INTO bookings
-			(id, branch_id, service_option_id, therapist_id, guest_name, guest_phone, code,
-			 start_time, end_time, status, source, created_at, updated_at)
+			(id, branch_id, service_option_id, therapist_id, guest_name, guest_phone,
+			 channel, channel_customer_id, code, start_time, end_time, status, source,
+			 created_at, updated_at)
 		VALUES
-			(gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, 'CONFIRMED', $9::booking_source, now(), now())
+			(gen_random_uuid()::text, $1, $2, $3, $4, $5,
+			 $6::channel, $7, $8, $9, $10, 'CONFIRMED', $11::booking_source,
+			 now(), now())
 		RETURNING id, code, start_time, end_time, status`,
-		p.BranchID, p.ServiceOptionID, p.TherapistID, p.GuestName, p.GuestPhone, p.Code,
-		p.StartTime, p.EndTime, p.Source,
+		p.BranchID, p.ServiceOptionID, p.TherapistID, p.GuestName, p.GuestPhone,
+		p.Channel, p.ChannelCustomerID, p.Code, p.StartTime, p.EndTime,
+		p.Source,
 	).Scan(&b.ID, &b.Code, &b.StartTime, &b.EndTime, &b.Status)
 	if err != nil {
 		return Booking{}, err
@@ -201,6 +226,8 @@ func insertBooking(ctx context.Context, tx pgx.Tx, p insertBookingParams) (Booki
 	b.ServiceOptionID = p.ServiceOptionID
 	b.GuestName = p.GuestName
 	b.GuestPhone = p.GuestPhone
+	b.Channel = p.Channel
+	b.ChannelCustomerID = p.ChannelCustomerID
 	b.Source = p.Source
 	return b, nil
 }
