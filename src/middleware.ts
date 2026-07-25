@@ -6,20 +6,26 @@ import { Role } from "@/generated/prisma/enums";
 const PROTECTED_ROUTES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/dashboard", roles: [Role.OWNER, Role.STAFF] },
   { prefix: "/therapist", roles: [Role.THERAPIST] },
-  { prefix: "/account", roles: [Role.CUSTOMER] },
-  { prefix: "/book", roles: [Role.CUSTOMER] },
 ];
 
 const ROLE_HOME: Record<Role, string> = {
   [Role.OWNER]: "/dashboard",
   [Role.STAFF]: "/dashboard",
   [Role.THERAPIST]: "/therapist",
-  [Role.CUSTOMER]: "/account",
+  [Role.CUSTOMER]: "/",
 };
 
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
+
+    // The customer web account portal is retired — customers are served through WhatsApp only
+    // now (LINE login was its only auth path and has been removed, see src/lib/auth.ts), but a
+    // still-valid JWT from before that change could otherwise keep reaching this page.
+    if (pathname.startsWith("/account")) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+
     const role = req.nextauth.token?.role;
 
     const rule = PROTECTED_ROUTES.find((r) => pathname.startsWith(r.prefix));
