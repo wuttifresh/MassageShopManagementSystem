@@ -1,16 +1,12 @@
-import { redirect } from "next/navigation";
-import { getCurrentSession } from "@/lib/session";
-import { BookingWizard } from "./booking-wizard";
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { LanguageSwitcher } from "@/i18n/language-switcher";
+import { Alert } from "@/components/ui/alert";
 
+// Web booking is temporarily disabled — the shop only takes bookings via WhatsApp for now.
+// BookingWizard (./booking-wizard.tsx) and its server action (./actions.ts) are left in place
+// unused so this entry point can be flipped back on later.
 export default async function BookPage() {
-  const session = await getCurrentSession();
-  if (!session?.user || session.user.role !== "CUSTOMER") {
-    redirect("/login?callbackUrl=/book");
-  }
-
   const dict = getDictionary(getLocale());
 
   return (
@@ -19,7 +15,9 @@ export default async function BookPage() {
         <h1 className="text-xl font-semibold text-gray-900">{dict.book.pageTitle}</h1>
         <LanguageSwitcher />
       </div>
-      <BookingWizard />
+      <Alert variant="warning" title={dict.channelDisabled.title}>
+        {dict.channelDisabled.description}
+      </Alert>
     </main>
   );
 }

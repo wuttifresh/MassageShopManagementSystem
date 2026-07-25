@@ -1,11 +1,11 @@
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { LanguageSwitcher } from "@/i18n/language-switcher";
-import { LiffBookingWizard } from "./liff-booking-wizard";
+import { Alert } from "@/components/ui/alert";
 
-// Public entry point for the LINE LIFF booking mini-app (multi-channel-booking-prompt.md, Phase
-// 3) — identity comes from liff.getIDToken() inside the wizard, not a NextAuth session, so this
-// page intentionally has no session check/redirect (unlike src/app/book/page.tsx).
+// LINE LIFF booking is temporarily disabled — the shop only takes bookings via WhatsApp for now.
+// LiffBookingWizard (./liff-booking-wizard.tsx) is left in place unused so this entry point can
+// be flipped back on later.
 export default function LiffBookingPage() {
   const dict = getDictionary(getLocale());
 
@@ -15,7 +15,9 @@ export default function LiffBookingPage() {
         <h1 className="text-xl font-semibold text-gray-900">{dict.liffBooking.pageTitle}</h1>
         <LanguageSwitcher />
       </div>
-      <LiffBookingWizard />
+      <Alert variant="warning" title={dict.channelDisabled.title}>
+        {dict.channelDisabled.description}
+      </Alert>
     </main>
   );
 }
