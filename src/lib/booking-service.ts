@@ -1,4 +1,4 @@
-import { Channel, type BookingSource } from "@/generated/prisma/client";
+import { Channel, BookingStatus, type BookingSource } from "@/generated/prisma/client";
 import { isDriverAdapterError } from "@prisma/driver-adapter-utils";
 import { prisma } from "@/lib/prisma";
 import { findAvailableTherapist, getAnyTherapistSlots, getTherapistSlots } from "@/lib/availability";
@@ -99,6 +99,10 @@ export type CreateBookingInput = {
   customer: BookingCustomerIdentity;
   /// Staff/admin-created bookings only; null for self-service bookings.
   createdById?: string | null;
+  /// Set when this call is *replacing* an existing booking (a reschedule) rather than a fresh
+  /// request — see rescheduleGuestBooking below. The superseded booking is marked RESCHEDULED in
+  /// the same transaction as the new booking's insert, so a crash between the two can't happen.
+  supersededBookingId?: string | null;
 };
 
 export type CreatedBooking = {
@@ -227,8 +231,16 @@ export async function createBooking(input: CreateBookingInput): Promise<CreatedB
             // user id (only meaningful for the "user" identity type — channel customers have no
             // User row to point at).
             createdById: input.createdById ?? customerId ?? undefined,
+            rescheduledFromId: input.supersededBookingId ?? undefined,
           },
         });
+
+        if (input.supersededBookingId) {
+          await tx.booking.update({
+            where: { id: input.supersededBookingId },
+            data: { status: BookingStatus.RESCHEDULED },
+          });
+        }
 
         await tx.auditLog.create({
           data: {
@@ -272,6 +284,115 @@ export async function createBooking(input: CreateBookingInput): Promise<CreatedB
   // Unreachable in practice (MAX_CODE_ATTEMPTS collisions in a row is astronomically unlikely),
   // but keeps the function's return type honest without a non-null assertion.
   throw new BookingServiceError("ไม่สามารถสร้างรหัสการจองได้ กรุณาลองใหม่อีกครั้ง");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// /book-now guest bookings (public web, no account) — see PhoneOtpChallenge's doc comment in
+// schema.prisma. A guest has no session/account, so "authentication" for managing an existing
+// booking is knowing both its public `code` and the phone number that OTP-verified it at creation
+// — the two checks below are always done together and return an identical not-found error either
+// way, so a wrong guess can't be used to probe which booking codes or phone numbers are real.
+// ─────────────────────────────────────────────────────────────────────────
+
+const GUEST_MANAGEABLE_STATUSES: BookingStatus[] = [BookingStatus.PENDING, BookingStatus.CONFIRMED];
+
+export type GuestBookingSummary = Awaited<ReturnType<typeof findGuestBooking>>;
+
+/// Looks up a Channel.WEB booking by its public code + the phone that owns it. Returns null if
+/// either doesn't match — see the section doc comment above for why that's deliberate.
+export async function findGuestBooking(code: string, phone: string) {
+  return prisma.booking.findFirst({
+    where: { code, channel: Channel.WEB, deletedAt: null, channelCustomer: { channelUserId: phone } },
+    include: { branch: true, serviceOption: { include: { service: true } }, therapist: true },
+  });
+}
+
+async function loadOwnedGuestBooking(bookingId: string, phone: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { channelCustomer: true },
+  });
+  if (!booking || booking.deletedAt || booking.channel !== Channel.WEB) return null;
+  if (!booking.channelCustomer || booking.channelCustomer.channelUserId !== phone) return null;
+  return booking;
+}
+
+export type GuestActionResult<T = undefined> =
+  | { success: true; data: T }
+  | { success: false; error: string; notFound?: boolean };
+
+export async function cancelGuestBooking(bookingId: string, phone: string): Promise<GuestActionResult> {
+  const booking = await loadOwnedGuestBooking(bookingId, phone);
+  if (!booking) return { success: false, error: "ไม่พบการจองนี้", notFound: true };
+  if (!GUEST_MANAGEABLE_STATUSES.includes(booking.status)) {
+    return { success: false, error: "ไม่สามารถยกเลิกการจองนี้ได้" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancelReason: "ลูกค้ายกเลิกเอง (จองผ่านเว็บ)" },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        branchId: booking.branchId,
+        action: "CANCEL_BOOKING",
+        entityType: "Booking",
+        entityId: bookingId,
+        beforeData: { status: booking.status },
+        afterData: { status: BookingStatus.CANCELLED },
+        metadata: { channelCustomerId: booking.channelCustomerId, channel: Channel.WEB },
+      },
+    });
+  });
+
+  return { success: true, data: undefined };
+}
+
+/// Mirrors src/app/account/actions.ts's rescheduleBooking (currently unreachable — the /account
+/// portal is retired, see src/middleware.ts) but authorizes by phone match instead of a session,
+/// and delegates the actual create+supersede to createBooking's supersededBookingId param instead
+/// of hand-rolling a second transaction here.
+export async function rescheduleGuestBooking(
+  bookingId: string,
+  phone: string,
+  date: string,
+  time: string
+): Promise<GuestActionResult<CreatedBooking>> {
+  const booking = await loadOwnedGuestBooking(bookingId, phone);
+  if (!booking) return { success: false, error: "ไม่พบการจองนี้", notFound: true };
+  if (!GUEST_MANAGEABLE_STATUSES.includes(booking.status)) {
+    return { success: false, error: "ไม่สามารถเลื่อนนัดการจองนี้ได้" };
+  }
+
+  try {
+    const created = await createBooking({
+      branchId: booking.branchId,
+      serviceOptionId: booking.serviceOptionId,
+      // Keep the same therapist as the original booking (or the same "any therapist" preference,
+      // if therapistId was already null) — if they're not free at the new time, the customer is
+      // asked to pick another time rather than silently swapping to a different person.
+      therapistId: booking.therapistId,
+      date,
+      time,
+      source: booking.source,
+      customer: {
+        type: "channel",
+        channel: Channel.WEB,
+        channelUserId: phone,
+        name: booking.channelCustomer!.name,
+        phone,
+      },
+      supersededBookingId: booking.id,
+    });
+    return { success: true, data: created };
+  } catch (error) {
+    if (error instanceof SlotTakenError || error instanceof BookingValidationError) {
+      return { success: false, error: error.message };
+    }
+    throw error;
+  }
 }
 
 export { Channel };

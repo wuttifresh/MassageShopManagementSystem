@@ -20,7 +20,7 @@ export const BookingStatus = {
 
 export const TherapistStatus = { ACTIVE: "ACTIVE", INACTIVE: "INACTIVE", ON_LEAVE: "ON_LEAVE" } as const;
 
-export const Channel = { LINE: "LINE", WHATSAPP: "WHATSAPP" } as const;
+export const Channel = { LINE: "LINE", WHATSAPP: "WHATSAPP", WEB: "WEB" } as const;
 
 export const BookingSource = { ONLINE: "ONLINE", WALK_IN: "WALK_IN", PHONE: "PHONE", ADMIN: "ADMIN" } as const;
 
