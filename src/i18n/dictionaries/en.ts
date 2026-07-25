@@ -55,8 +55,6 @@ const en: Dictionary = {
     submit: "Sign in",
     submitting: "Signing in...",
     error: "Incorrect email or password",
-    or: "or",
-    lineLogin: "Sign in with LINE (customers)",
   },
   dashboard: {
     title: "Queue dashboard",

@@ -59,20 +59,6 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           {dict.login.submit}
         </Button>
       </form>
-
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <span className="h-px flex-1 bg-border" />
-        {dict.login.or}
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => signIn("line", { callbackUrl })}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#06C755] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-      >
-        {dict.login.lineLogin}
-      </button>
     </div>
   );
 }

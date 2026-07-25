@@ -9,7 +9,7 @@ const ROLE_HOME: Record<string, string> = {
   OWNER: "/dashboard",
   STAFF: "/dashboard",
   THERAPIST: "/therapist",
-  CUSTOMER: "/account",
+  CUSTOMER: "/",
 };
 
 export default async function LoginPage({

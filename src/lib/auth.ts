@@ -1,12 +1,12 @@
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import LineProvider from "next-auth/providers/line";
 import { Role } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /// Staff-side roles that are allowed to log in with email + password.
-/// CUSTOMER is intentionally excluded — customers only authenticate via LINE Login.
+/// CUSTOMER is intentionally excluded — customer-facing login (LINE) has been retired; customers
+/// are served through WhatsApp only now (see src/app/api/bookings/route.ts).
 const CREDENTIALS_LOGIN_ROLES: Role[] = [Role.OWNER, Role.STAFF, Role.THERAPIST];
 
 export const authOptions: NextAuthOptions = {
@@ -44,43 +44,8 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    LineProvider({
-      clientId: process.env.LINE_CLIENT_ID ?? "",
-      clientSecret: process.env.LINE_CLIENT_SECRET ?? "",
-    }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      // LINE Login has no concept of our internal Role/User id, so resolve (or create) the
-      // matching CUSTOMER row here and overwrite `user` with our own identity before the jwt
-      // callback runs.
-      if (account?.provider === "line") {
-        const lineUserId = account.providerAccountId;
-
-        let customer = await prisma.user.findUnique({ where: { lineUserId } });
-
-        if (!customer) {
-          customer = await prisma.user.create({
-            data: {
-              role: Role.CUSTOMER,
-              name: user.name ?? "ลูกค้า LINE",
-              image: user.image,
-              lineUserId,
-              lineDisplayName: user.name,
-              membership: { create: {} },
-            },
-          });
-        }
-
-        if (!customer.isActive || customer.deletedAt) return false;
-
-        user.id = customer.id;
-        user.role = customer.role;
-        user.branchId = null;
-      }
-
-      return true;
-    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
