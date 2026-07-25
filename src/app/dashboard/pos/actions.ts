@@ -7,6 +7,7 @@ import { awardPoints, calculatePointsEarned, reversePoints } from "@/lib/loyalty
 import { prisma } from "@/lib/prisma";
 import { requireStaffSession } from "@/lib/staff-auth";
 import { startOfToday, endOfToday } from "@/lib/queue";
+import { resolveVoucher, redeemVoucher, releaseVoucherRedemption, VoucherError } from "@/lib/voucher";
 
 type ActionResult<T = undefined> = { success: true; data: T } | { success: false; error: string };
 
@@ -17,11 +18,16 @@ const VAT_RATE = 7;
 /// caught below and turned into a friendly error instead of a 500.
 class PackageExhaustedError extends Error {}
 
+/// Same idea as PackageExhaustedError, for a Product's stockQuantity running out between the
+/// pre-check and the atomic decrement (Phase 4).
+class ProductOutOfStockError extends Error {}
+
 /// Prices shown to customers throughout booking are VAT-inclusive (one clean number, no
 /// "+VAT" surprise at checkout) — so vatAmount here is a breakdown backed out of the total,
-/// not an extra charge on top of it.
-function computeVat(totalAmount: number): number {
-  return Math.round(((totalAmount * VAT_RATE) / (100 + VAT_RATE)) * 100) / 100;
+/// not an extra charge on top of it. Tips are never part of this — see CreateTransactionInput's
+/// doc comment.
+function computeVat(netBeforeTip: number): number {
+  return Math.round(((netBeforeTip * VAT_RATE) / (100 + VAT_RATE)) * 100) / 100;
 }
 
 async function generateReceiptNo(branchId: string): Promise<string> {
@@ -32,20 +38,39 @@ async function generateReceiptNo(branchId: string): Promise<string> {
   return `R${datePart}-${String(count + 1).padStart(4, "0")}`;
 }
 
-export type CheckoutLineItemInput = {
+export type ServiceLineItemInput = {
+  kind: "service";
   serviceOptionId: string;
   therapistId: string;
   quantity: number;
   /// Set when this line is paid for by redeeming a course credit instead of cash — the
   /// customer already paid when they bought the package, so this line charges ฿0 today.
   packageId?: string | null;
+  /// Gratuity for this line's therapist (Phase 4) — paid out in full, never discounted, never
+  /// subject to VAT, and doesn't count toward loyalty points (see CreateTransactionInput).
+  tipAmount?: string;
 };
+
+/// A retail add-on line (Phase 4) — น้ำมันนวด, ชา, ฯลฯ. No therapist/commission/tip; stock is
+/// deducted atomically at checkout (see Product.stockQuantity's doc comment).
+export type ProductLineItemInput = {
+  kind: "product";
+  productId: string;
+  quantity: number;
+};
+
+export type CheckoutLineItemInput = ServiceLineItemInput | ProductLineItemInput;
 
 export type CreateTransactionInput = {
   branchId: string;
   queueId?: string;
   paymentMethod: PaymentMethod;
+  /// Ignored when voucherCode is set — a code and a hand-typed amount are mutually exclusive,
+  /// never combined, to avoid double-discounting.
   discountAmount: string;
+  /// A reusable promo code (Phase 4) — resolved server-side; the discount amount it computes
+  /// overrides discountAmount above. Redeemed atomically inside the checkout transaction.
+  voucherCode?: string;
   items: CheckoutLineItemInput[];
 };
 
@@ -56,9 +81,6 @@ export async function createTransaction(
   if (!session) return { success: false, error: "ไม่มีสิทธิ์ดำเนินการ" };
 
   if (input.items.length === 0) return { success: false, error: "กรุณาเพิ่มรายการอย่างน้อย 1 รายการ" };
-
-  const discount = Number(input.discountAmount || "0");
-  if (Number.isNaN(discount) || discount < 0) return { success: false, error: "ส่วนลดไม่ถูกต้อง" };
 
   let customerId: string | null = null;
   if (input.queueId) {
@@ -72,7 +94,7 @@ export async function createTransaction(
 
   // Never trust a client-submitted price — look up the real, current price/promo for every line
   // server-side, and snapshot the therapist's commission at this exact moment (hard rule #4).
-  const resolvedItems: {
+  const resolvedServiceItems: {
     serviceOptionId: string;
     therapistId: string;
     quantity: number;
@@ -82,9 +104,26 @@ export async function createTransaction(
     commissionRate: number;
     commissionAmount: number;
     packageId: string | null;
+    tipAmount: number;
   }[] = [];
+  const resolvedProductItems: { productId: string; quantity: number; unitPrice: number; lineTotal: number }[] = [];
 
   for (const item of input.items) {
+    if (item.kind === "product") {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (!product || product.deletedAt || !product.isActive || product.branchId !== input.branchId) {
+        return { success: false, error: "ไม่พบสินค้าที่เลือก" };
+      }
+      const quantity = Math.max(1, Math.floor(item.quantity));
+      if (product.stockQuantity < quantity) {
+        return { success: false, error: `สินค้า "${product.name}" มีไม่พอ (เหลือ ${product.stockQuantity} ชิ้น)` };
+      }
+
+      const unitPrice = Number(product.price);
+      resolvedProductItems.push({ productId: product.id, quantity, unitPrice, lineTotal: unitPrice * quantity });
+      continue;
+    }
+
     const option = await prisma.serviceOption.findUnique({ where: { id: item.serviceOptionId } });
     if (!option) return { success: false, error: "ไม่พบบริการที่เลือก" };
 
@@ -94,6 +133,9 @@ export async function createTransaction(
     // via a package (the shop already collected that cash when the package was sold), so
     // commission is always computed off the nominal value — never off the ฿0 charged today.
     const nominalLineTotal = unitPrice * quantity;
+
+    const tipAmount = Number(item.tipAmount || "0");
+    if (Number.isNaN(tipAmount) || tipAmount < 0) return { success: false, error: "ยอดทิปไม่ถูกต้อง" };
 
     let packageId: string | null = null;
     let lineTotal = nominalLineTotal;
@@ -116,23 +158,48 @@ export async function createTransaction(
 
     const commission = await computeCommission(item.therapistId, option.serviceId, nominalLineTotal, quantity);
 
-    resolvedItems.push({
+    resolvedServiceItems.push({
       serviceOptionId: option.id,
       therapistId: item.therapistId,
       quantity,
       unitPrice,
       lineTotal,
       packageId,
+      tipAmount,
       ...commission,
     });
   }
 
-  const subtotal = resolvedItems.reduce((sum, i) => sum + i.lineTotal, 0);
-  if (discount > subtotal) return { success: false, error: "ส่วนลดต้องไม่มากกว่ายอดรวม" };
+  const subtotal =
+    resolvedServiceItems.reduce((sum, i) => sum + i.lineTotal, 0) +
+    resolvedProductItems.reduce((sum, i) => sum + i.lineTotal, 0);
+  const tipTotal = resolvedServiceItems.reduce((sum, i) => sum + i.tipAmount, 0);
 
-  const totalAmount = subtotal - discount;
-  const vatAmount = computeVat(totalAmount);
-  const pointsEarned = calculatePointsEarned(totalAmount);
+  let discount: number;
+  let voucherId: string | null = null;
+  let voucherMaxRedemptions: number | null = null;
+  if (input.voucherCode?.trim()) {
+    try {
+      const resolved = await resolveVoucher(input.voucherCode, subtotal);
+      discount = resolved.discountAmount;
+      voucherId = resolved.voucherId;
+      voucherMaxRedemptions = resolved.maxRedemptions;
+    } catch (error) {
+      if (error instanceof VoucherError) return { success: false, error: error.message };
+      throw error;
+    }
+  } else {
+    discount = Number(input.discountAmount || "0");
+    if (Number.isNaN(discount) || discount < 0) return { success: false, error: "ส่วนลดไม่ถูกต้อง" };
+    if (discount > subtotal) return { success: false, error: "ส่วนลดต้องไม่มากกว่ายอดรวม" };
+  }
+
+  const netBeforeTip = subtotal - discount;
+  const vatAmount = computeVat(netBeforeTip);
+  const totalAmount = netBeforeTip + tipTotal;
+  // Loyalty points are earned on what the shop actually took in for merchandise — not on
+  // gratuity, which passes straight through to the therapist.
+  const pointsEarned = calculatePointsEarned(netBeforeTip);
 
   // Receipt numbers are generated by counting today's transactions, which races under real
   // concurrency (two checkouts can compute the same number). The `receiptNo` unique constraint
@@ -151,10 +218,12 @@ export async function createTransaction(
             queueId: input.queueId ?? null,
             receiptNo,
             cashierId: session.user.id,
+            voucherId,
             subtotal,
             discountAmount: discount,
             vatRate: VAT_RATE,
             vatAmount,
+            tipTotal,
             totalAmount,
             paymentMethod: input.paymentMethod,
             status: TransactionStatus.PAID,
@@ -162,7 +231,7 @@ export async function createTransaction(
           },
         });
 
-        for (const item of resolvedItems) {
+        for (const item of resolvedServiceItems) {
           const createdItem = await tx.transactionItem.create({
             data: {
               transactionId: created.id,
@@ -174,6 +243,7 @@ export async function createTransaction(
               commissionType: item.commissionType,
               commissionRate: item.commissionRate,
               commissionAmount: item.commissionAmount,
+              tipAmount: item.tipAmount,
             },
           });
 
@@ -205,6 +275,30 @@ export async function createTransaction(
           }
         }
 
+        for (const item of resolvedProductItems) {
+          await tx.transactionItem.create({
+            data: {
+              transactionId: created.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPriceSnapshot: item.unitPrice,
+              lineTotal: item.lineTotal,
+            },
+          });
+
+          // Atomic, race-safe cut — same guarantee as the package decrement above, applied to
+          // physical stock (hard rule #5).
+          const decremented = await tx.product.updateMany({
+            where: { id: item.productId, stockQuantity: { gte: item.quantity } },
+            data: { stockQuantity: { decrement: item.quantity } },
+          });
+          if (decremented.count === 0) throw new ProductOutOfStockError();
+        }
+
+        if (voucherId) {
+          await redeemVoucher(tx, voucherId, voucherMaxRedemptions);
+        }
+
         await tx.auditLog.create({
           data: {
             actorId: session.user.id,
@@ -216,8 +310,10 @@ export async function createTransaction(
             afterData: {
               receiptNo,
               totalAmount,
+              tipTotal,
+              voucherCode: input.voucherCode?.trim() || null,
               paymentMethod: input.paymentMethod,
-              itemCount: resolvedItems.length,
+              itemCount: resolvedServiceItems.length + resolvedProductItems.length,
             },
           },
         });
@@ -246,6 +342,12 @@ export async function createTransaction(
     } catch (error) {
       if (error instanceof PackageExhaustedError) {
         return { success: false, error: "ขออภัย คอร์สนี้เพิ่งถูกใช้ครบไปแล้ว กรุณาเลือกวิธีชำระเงินอื่น" };
+      }
+      if (error instanceof ProductOutOfStockError) {
+        return { success: false, error: "ขออภัย สินค้าเพิ่งหมดสต๊อกไปพอดี กรุณาลองใหม่อีกครั้ง" };
+      }
+      if (error instanceof VoucherError) {
+        return { success: false, error: error.message };
       }
       // Postgres unique-violation errors from Prisma don't consistently give `meta.target` as an
       // array of column names the way MySQL's do — it can be the constraint name as a plain
@@ -279,7 +381,9 @@ export async function voidTransaction(transactionId: string, reason: string): Pr
   }
   if (!reason.trim()) return { success: false, error: "กรุณาระบุเหตุผลการยกเลิก" };
 
-  const pointsEarned = calculatePointsEarned(Number(transaction.totalAmount));
+  // Points were originally earned on (subtotal - discount), never on tips — see createTransaction.
+  const netBeforeTip = Number(transaction.subtotal) - Number(transaction.discountAmount);
+  const pointsEarned = calculatePointsEarned(netBeforeTip);
   const customerId = transaction.queue?.customerId ?? null;
 
   await prisma.$transaction(async (tx) => {
@@ -304,6 +408,13 @@ export async function voidTransaction(transactionId: string, reason: string): Pr
     // Restore any package sessions this transaction consumed — via a compensating ledger entry,
     // never by mutating or deleting the original PackageUsage row (it must stay append-only).
     for (const item of transaction.items) {
+      if (item.productId) {
+        // Restore stock for any product lines (Phase 4) — the mirror of the atomic decrement in
+        // createTransaction; void isn't racing anything, so a plain increment is enough here.
+        await tx.product.update({ where: { id: item.productId }, data: { stockQuantity: { increment: item.quantity } } });
+        continue;
+      }
+
       const usage = await tx.packageUsage.findUnique({ where: { transactionItemId: item.id } });
       if (!usage) continue;
 
@@ -320,6 +431,10 @@ export async function voidTransaction(transactionId: string, reason: string): Pr
           note: `คืนครั้งจากการยกเลิกใบเสร็จ ${transaction.receiptNo}`,
         },
       });
+    }
+
+    if (transaction.voucherId) {
+      await releaseVoucherRedemption(tx, transaction.voucherId);
     }
 
     if (customerId && pointsEarned > 0) {

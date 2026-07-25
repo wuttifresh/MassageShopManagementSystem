@@ -585,6 +585,67 @@ CREATE TABLE "phone_otp_challenges" (
 CREATE INDEX "phone_otp_challenges_phone_created_at_idx" ON "phone_otp_challenges"("phone", "created_at");
 
 -- ============================================================
+-- Migration: 20260725182956_add_products_vouchers_tips
+-- ============================================================
+-- CreateEnum
+CREATE TYPE "discount_type" AS ENUM ('PERCENTAGE', 'FIXED_AMOUNT');
+
+-- AlterTable
+ALTER TABLE "transaction_items" ADD COLUMN     "product_id" TEXT,
+ADD COLUMN     "tip_amount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+ALTER COLUMN "service_option_id" DROP NOT NULL;
+
+-- AlterTable
+ALTER TABLE "transactions" ADD COLUMN     "tip_total" DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "voucher_id" TEXT;
+
+-- CreateTable
+CREATE TABLE "products" (
+    "id" TEXT NOT NULL,
+    "branch_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "price" DECIMAL(10,2) NOT NULL,
+    "stock_quantity" INTEGER NOT NULL DEFAULT 0,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "deleted_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "products_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "vouchers" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "discount_type" "discount_type" NOT NULL,
+    "discount_value" DECIMAL(10,2) NOT NULL,
+    "max_redemptions" INTEGER,
+    "redemption_count" INTEGER NOT NULL DEFAULT 0,
+    "expires_at" TIMESTAMP(3),
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "vouchers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "products_branch_id_idx" ON "products"("branch_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vouchers_code_key" ON "vouchers"("code");
+
+-- AddForeignKey
+ALTER TABLE "transactions" ADD CONSTRAINT "transactions_voucher_id_fkey" FOREIGN KEY ("voucher_id") REFERENCES "vouchers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transaction_items" ADD CONSTRAINT "transaction_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "products" ADD CONSTRAINT "products_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- ============================================================
 -- Prisma migration bookkeeping
 -- ============================================================
 -- Lets a future `prisma migrate deploy`/`dev` run recognize the migrations above as already
@@ -601,18 +662,20 @@ CREATE TABLE "_prisma_migrations" (
 );
 
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('e127f87e-9bd1-42d6-944a-8f4d76c097c5', '0ebade7c20ad09ca7cd9f2e44fb1aabedb8fb7cfb8c5f7dc86ec682558d8ab25', now(), '20260701061535_init', now(), 1);
+VALUES ('766027dc-144f-40e7-858d-90814053e4e1', '0ebade7c20ad09ca7cd9f2e44fb1aabedb8fb7cfb8c5f7dc86ec682558d8ab25', now(), '20260701061535_init', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('53ff2612-c2d1-4d28-96bb-023119161e83', 'd354452499689c7ed0f19bc535074cd79634889da7d4111bc385565b72433314', now(), '20260701075446_add_service_option_promo_price', now(), 1);
+VALUES ('42c4769c-6ce5-4de7-95f8-6e075d601a00', 'd354452499689c7ed0f19bc535074cd79634889da7d4111bc385565b72433314', now(), '20260701075446_add_service_option_promo_price', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('9dd0b670-303c-4e71-9663-a8b6306d440d', '0ce7a62b1c9c83b7c4ace2d910a6cc9b60e1936784c99ce4f99ce6d8f60519f1', now(), '20260701090735_add_package_service_relation', now(), 1);
+VALUES ('03d33eda-1f4d-44e0-b649-04870491d3f8', '0ce7a62b1c9c83b7c4ace2d910a6cc9b60e1936784c99ce4f99ce6d8f60519f1', now(), '20260701090735_add_package_service_relation', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('1a7a21b2-b5e9-482e-9bf3-14d86eebf073', '15679d9e1cd6c27c0885173b6bc1399bc79fead79a0b80dfbf3f4b49b3451bb5', now(), '20260701101450_add_booking_reminder_sent_at', now(), 1);
+VALUES ('19d78796-d0f6-4be2-a4cc-bbae7c77dcab', '15679d9e1cd6c27c0885173b6bc1399bc79fead79a0b80dfbf3f4b49b3451bb5', now(), '20260701101450_add_booking_reminder_sent_at', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('a56aba7f-6cec-4d20-b944-5b1f55d847ec', '55665f12770186455aff9d13f6cacc87342985c2ae8fc995154c4ab9e057279d', now(), '20260703120000_add_multichannel_customer', now(), 1);
+VALUES ('578f300c-0412-4ec2-97d7-47d0b2b63a87', '55665f12770186455aff9d13f6cacc87342985c2ae8fc995154c4ab9e057279d', now(), '20260703120000_add_multichannel_customer', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('cfe24db3-a6bc-451f-98be-37b980a569f7', '8c64ec15524e838d01ddaf189d27812df726fe069bb9722147d13eaba0f2cf14', now(), '20260703180000_add_send_notification_audit_action', now(), 1);
+VALUES ('316d0604-2622-4304-bf41-725d54695c4b', '8c64ec15524e838d01ddaf189d27812df726fe069bb9722147d13eaba0f2cf14', now(), '20260703180000_add_send_notification_audit_action', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('997d49dc-4c98-4b2c-a0b3-2bfbb0277b80', '9272a343cea396abdd81c1e9e4991e1d8bf0762345aff8eee37dedca0dd2167c', now(), '20260725165611_add_web_channel_and_phone_otp', now(), 1);
+VALUES ('90aba6d7-c42a-4e47-b78d-0e33864a7e8f', '9272a343cea396abdd81c1e9e4991e1d8bf0762345aff8eee37dedca0dd2167c', now(), '20260725165611_add_web_channel_and_phone_otp', now(), 1);
+INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
+VALUES ('3383d28b-1bca-45c3-ba14-f677cd259dc9', 'a4d9bb1d9f66390a4ddfcfa5fc3d3f17b352372815150ebc0b53da090d0ea039', now(), '20260725182956_add_products_vouchers_tips', now(), 1);
 
 COMMIT;

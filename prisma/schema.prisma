@@ -105,6 +105,13 @@ enum TransactionStatus {
   @@map("transaction_status")
 }
 
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+
+  @@map("discount_type")
+}
+
 enum PackageStatus {
   ACTIVE
   EXPIRED
@@ -269,6 +276,7 @@ model Branch {
   queues             Queue[]
   transactions       Transaction[]
   packages           Package[]
+  products           Product[]
   auditLogs          AuditLog[]
 
   deletedAt DateTime? @map("deleted_at")
@@ -530,11 +538,19 @@ model Transaction {
   cashierId String @map("cashier_id")
   cashier   User   @relation("TransactionCashier", fields: [cashierId], references: [id], onDelete: Restrict)
 
+  /// Set when a voucher code (Phase 4 — POS add-ons/vouchers) was redeemed on this sale;
+  /// `discountAmount` below is computed from it instead of being typed in by hand when set.
+  voucherId String?  @map("voucher_id")
+  voucher   Voucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+
   subtotal       Decimal @db.Decimal(10, 2)
   discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(10, 2)
   /// VAT rate snapshotted at sale time (e.g. 7.00) so a future rate change never rewrites history.
   vatRate        Decimal @default(7) @map("vat_rate") @db.Decimal(5, 2)
   vatAmount      Decimal @map("vat_amount") @db.Decimal(10, 2)
+  /// Sum of every line's tipAmount — gratuity, never subject to VAT/discount, paid out to the
+  /// therapist in full (see TransactionItem.tipAmount).
+  tipTotal       Decimal @default(0) @map("tip_total") @db.Decimal(10, 2)
   totalAmount    Decimal @map("total_amount") @db.Decimal(10, 2)
 
   paymentMethod PaymentMethod     @map("payment_method")
@@ -553,16 +569,24 @@ model Transaction {
   @@map("transactions")
 }
 
-/// One line item of a Transaction. Price and therapist commission are both snapshotted here at
-/// sale time — never recompute historical payouts from the therapist's current rate.
+/// One line item of a Transaction — either a massage service (`serviceOptionId` set) or a retail
+/// add-on product (`productId` set), never both. Price and therapist commission are both
+/// snapshotted here at sale time — never recompute historical payouts from the therapist's
+/// current rate.
 model TransactionItem {
   id String @id @default(cuid())
 
   transactionId String      @map("transaction_id")
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
-  serviceOptionId String        @map("service_option_id")
-  serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
+  /// Null for a product line (Phase 4) — see the model doc comment above.
+  serviceOptionId String?        @map("service_option_id")
+  serviceOption   ServiceOption? @relation(fields: [serviceOptionId], references: [id], onDelete: Restrict)
+
+  /// Set for a retail add-on line (Phase 4) instead of serviceOptionId — no therapist/commission,
+  /// just a straight retail sale with stock deducted atomically (see Product.stockQuantity).
+  productId String?  @map("product_id")
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   therapistId String?    @map("therapist_id")
   therapist   Therapist? @relation(fields: [therapistId], references: [id], onDelete: SetNull)
@@ -572,10 +596,13 @@ model TransactionItem {
   lineTotal         Decimal @map("line_total") @db.Decimal(10, 2)
 
   /// Snapshot of Therapist.commissionType/commissionRate (or the TherapistService override) at
-  /// the moment of sale — see hard rule #4.
+  /// the moment of sale — see hard rule #4. Always null for a product line.
   commissionType   CommissionType? @map("commission_type")
   commissionRate   Decimal?        @map("commission_rate") @db.Decimal(10, 2)
   commissionAmount Decimal         @default(0) @map("commission_amount") @db.Decimal(10, 2)
+
+  /// Gratuity for this line's therapist — paid out in full, not part of `lineTotal`/VAT (Phase 4).
+  tipAmount Decimal @default(0) @map("tip_amount") @db.Decimal(10, 2)
 
   /// Set when this line was paid for by redeeming a course credit instead of cash.
   packageUsage PackageUsage?
@@ -583,6 +610,55 @@ model TransactionItem {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("transaction_items")
+}
+
+/// A retail add-on sold at POS (น้ำมันนวด, ชา, ฯลฯ) — Phase 4. Branch-scoped (each branch tracks
+/// its own physical stock), unlike Service/ServiceOption which are a shared, therapist-performed
+/// catalog. `stockQuantity` is only ever decremented atomically together with a checkout, and
+/// restored the same way on void — same pattern as Package.remainingSessions (hard rule #5).
+model Product {
+  id String @id @default(cuid())
+
+  branchId String @map("branch_id")
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name          String
+  price         Decimal @db.Decimal(10, 2)
+  stockQuantity Int     @default(0) @map("stock_quantity")
+  isActive      Boolean @default(true) @map("is_active")
+
+  transactionItems TransactionItem[]
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("products")
+}
+
+/// A reusable promo code (Phase 4) — e.g. "SUMMER10" — redeemable by any customer, up to
+/// `maxRedemptions` times (null = unlimited) and/or until `expiresAt`. `redemptionCount` is only
+/// ever incremented atomically together with a checkout that applies the code, guarded by the
+/// same limit, so two concurrent checkouts can't both squeeze through the last redemption.
+model Voucher {
+  id   String @id @default(cuid())
+  code String @unique
+
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
+
+  maxRedemptions  Int?      @map("max_redemptions")
+  redemptionCount Int       @default(0) @map("redemption_count")
+  expiresAt       DateTime? @map("expires_at")
+  isActive        Boolean   @default(true) @map("is_active")
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("vouchers")
 }
 
 // ─────────────────────────────────────────────────────────────────────────

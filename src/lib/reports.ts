@@ -43,7 +43,7 @@ export async function getSalesReport({
       createdAt: { gte: startDate, lt: endDate },
     },
     include: {
-      items: { include: { serviceOption: { include: { service: true } }, therapist: true } },
+      items: { include: { serviceOption: { include: { service: true } }, product: true, therapist: true } },
     },
   });
 
@@ -66,6 +66,10 @@ export async function getSalesReport({
 
     for (const item of tx.items) {
       totalCommission += Number(item.commissionAmount);
+
+      // Product lines (Phase 4) have no serviceOption — they don't belong in the by-service
+      // breakdown (and have no therapist to attribute below either).
+      if (!item.serviceOption) continue;
 
       const serviceId = item.serviceOption.serviceId;
       const svcRow = byServiceMap.get(serviceId) ?? {

@@ -25,11 +25,14 @@ export type CustomerPackage = {
   remainingSessions: number;
 };
 
+export type BranchProduct = { id: string; name: string; price: string; stockQuantity: number };
+
 type ServiceOption = { id: string; durationMinutes: number; price: string; promoPrice: string | null };
 type Service = { id: string; name: string; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string };
 
-type LineItem = {
+type ServiceLineItem = {
+  kind: "service";
   key: string;
   serviceId: string;
   serviceOptionId: string;
@@ -37,7 +40,18 @@ type LineItem = {
   quantity: number;
   /// "" = pay with the selected payment method below; otherwise the id of the Package to redeem.
   packageId: string;
+  /// Gratuity for this line's therapist (Phase 4) — entered as a plain baht string, like discountAmount.
+  tipAmount: string;
 };
+
+type ProductLineItem = {
+  kind: "product";
+  key: string;
+  productId: string;
+  quantity: number;
+};
+
+type LineItem = ServiceLineItem | ProductLineItem;
 
 const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "CASH", label: "เงินสด" },
@@ -52,22 +66,42 @@ function nextKey(): string {
   return `line-${keyCounter}`;
 }
 
+function newServiceLine(): ServiceLineItem {
+  return {
+    kind: "service",
+    key: nextKey(),
+    serviceId: "",
+    serviceOptionId: "",
+    therapistId: "",
+    quantity: 1,
+    packageId: "",
+    tipAmount: "0",
+  };
+}
+
+function newProductLine(): ProductLineItem {
+  return { kind: "product", key: nextKey(), productId: "", quantity: 1 };
+}
+
 export function Checkout({
   branchId,
   queueId,
   prefillItem,
   customerPackages,
+  products,
 }: {
   branchId: string;
   queueId?: string;
   prefillItem?: PrefillLineItem;
   customerPackages: CustomerPackage[];
+  products: BranchProduct[];
 }) {
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [therapistsByService, setTherapistsByService] = useState<Record<string, Therapist[]>>({});
   const [items, setItems] = useState<LineItem[]>([]);
   const [discountAmount, setDiscountAmount] = useState("0");
+  const [voucherCode, setVoucherCode] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +120,10 @@ export function Checkout({
     if (!parentService) return;
     setItems([
       {
-        key: nextKey(),
+        ...newServiceLine(),
         serviceId: parentService.id,
         serviceOptionId: prefillItem.serviceOptionId,
         therapistId: prefillItem.therapistId ?? "",
-        quantity: 1,
-        packageId: "",
       },
     ]);
     loadTherapists(parentService.id);
@@ -107,19 +139,24 @@ export function Checkout({
       );
   }
 
-  function addLineItem() {
-    setItems((rows) => [
-      ...rows,
-      { key: nextKey(), serviceId: "", serviceOptionId: "", therapistId: "", quantity: 1, packageId: "" },
-    ]);
+  function addServiceLine() {
+    setItems((rows) => [...rows, newServiceLine()]);
+  }
+
+  function addProductLine() {
+    setItems((rows) => [...rows, newProductLine()]);
   }
 
   function removeLineItem(key: string) {
     setItems((rows) => rows.filter((r) => r.key !== key));
   }
 
-  function updateLineItem(key: string, patch: Partial<LineItem>) {
-    setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  function updateServiceLine(key: string, patch: Partial<ServiceLineItem>) {
+    setItems((rows) => rows.map((r) => (r.key === key && r.kind === "service" ? { ...r, ...patch } : r)));
+  }
+
+  function updateProductLine(key: string, patch: Partial<ProductLineItem>) {
+    setItems((rows) => rows.map((r) => (r.key === key && r.kind === "product" ? { ...r, ...patch } : r)));
   }
 
   function findOption(serviceId: string, serviceOptionId: string): ServiceOption | undefined {
@@ -130,20 +167,32 @@ export function Checkout({
     return customerPackages.filter((p) => !p.serviceId || p.serviceId === serviceId);
   }
 
-  const { subtotal, vatAmount, totalAmount } = useMemo(() => {
-    const sub = items.reduce((sum, item) => {
-      if (item.packageId) return sum; // paid for via the package already, ฿0 charged today
+  const { subtotal, tipTotal, vatAmount, totalAmount } = useMemo(() => {
+    let sub = 0;
+    let tips = 0;
+
+    for (const item of items) {
+      if (item.kind === "product") {
+        const product = products.find((p) => p.id === item.productId);
+        if (product) sub += Number(product.price) * item.quantity;
+        continue;
+      }
+      tips += Number(item.tipAmount || "0") || 0;
+      if (item.packageId) continue; // paid for via the package already, ฿0 charged today
       const option = findOption(item.serviceId, item.serviceOptionId);
-      if (!option) return sum;
+      if (!option) continue;
       const unitPrice = Number(option.promoPrice ?? option.price);
-      return sum + unitPrice * item.quantity;
-    }, 0);
+      sub += unitPrice * item.quantity;
+    }
+
     const discount = Number(discountAmount || "0") || 0;
-    const total = Math.max(0, sub - discount);
-    const vat = Math.round(((total * 7) / 107) * 100) / 100;
-    return { subtotal: sub, vatAmount: vat, totalAmount: total };
+    // A voucher code's discount is only known once resolved server-side — this estimate ignores
+    // it, so the actual receipt total may come back lower than what's shown here while typing.
+    const netBeforeTip = Math.max(0, sub - discount);
+    const vat = Math.round(((netBeforeTip * 7) / 107) * 100) / 100;
+    return { subtotal: sub, tipTotal: tips, vatAmount: vat, totalAmount: netBeforeTip + tips };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, discountAmount, services]);
+  }, [items, discountAmount, services, products]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,24 +202,35 @@ export function Checkout({
       setError("กรุณาเพิ่มรายการอย่างน้อย 1 รายการ");
       return;
     }
-    if (items.some((i) => !i.serviceOptionId || !i.therapistId)) {
+    if (items.some((i) => i.kind === "service" && (!i.serviceOptionId || !i.therapistId))) {
       setError("กรุณาเลือกบริการและหมอนวดให้ครบทุกรายการ");
+      return;
+    }
+    if (items.some((i) => i.kind === "product" && !i.productId)) {
+      setError("กรุณาเลือกสินค้าให้ครบทุกรายการ");
       return;
     }
 
     setIsSubmitting(true);
-    const payloadItems: CheckoutLineItemInput[] = items.map((i) => ({
-      serviceOptionId: i.serviceOptionId,
-      therapistId: i.therapistId,
-      quantity: i.quantity,
-      packageId: i.packageId || null,
-    }));
+    const payloadItems: CheckoutLineItemInput[] = items.map((i) =>
+      i.kind === "product"
+        ? { kind: "product", productId: i.productId, quantity: i.quantity }
+        : {
+            kind: "service",
+            serviceOptionId: i.serviceOptionId,
+            therapistId: i.therapistId,
+            quantity: i.quantity,
+            packageId: i.packageId || null,
+            tipAmount: i.tipAmount,
+          }
+    );
 
     const result = await createTransaction({
       branchId,
       queueId,
       paymentMethod,
       discountAmount,
+      voucherCode: voucherCode.trim() || undefined,
       items: payloadItems,
     });
 
@@ -186,6 +246,50 @@ export function Checkout({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         {items.map((item) => {
+          if (item.kind === "product") {
+            const product = products.find((p) => p.id === item.productId);
+            return (
+              <div key={item.key} className="flex flex-col gap-2.5 rounded-xl border border-border p-3.5 text-sm">
+                <Select
+                  value={item.productId}
+                  onChange={(e) => updateProductLine(item.key, { productId: e.target.value })}
+                >
+                  <option value="">เลือกสินค้า</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.stockQuantity <= 0}>
+                      {p.name} — ฿{p.price} {p.stockQuantity <= 0 ? "(หมด)" : `(เหลือ ${p.stockQuantity})`}
+                    </option>
+                  ))}
+                </Select>
+
+                {product && (
+                  <label className="flex items-center gap-2 text-text-secondary">
+                    จำนวน
+                    <input
+                      type="number"
+                      min={1}
+                      max={product.stockQuantity}
+                      value={item.quantity}
+                      onChange={(e) => updateProductLine(item.key, { quantity: Math.max(1, Number(e.target.value)) })}
+                      className="w-20 rounded-lg border border-border px-2 py-1"
+                    />
+                    <span className="font-medium text-gray-900">
+                      รวม: ฿{(Number(product.price) * item.quantity).toFixed(2)}
+                    </span>
+                  </label>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => removeLineItem(item.key)}
+                  className="self-start text-xs font-medium text-danger hover:text-danger-hover"
+                >
+                  ลบรายการนี้
+                </button>
+              </div>
+            );
+          }
+
           const service = services.find((s) => s.id === item.serviceId);
           const option = findOption(item.serviceId, item.serviceOptionId);
           const therapists = therapistsByService[item.serviceId] ?? [];
@@ -197,7 +301,7 @@ export function Checkout({
                 value={item.serviceId}
                 onChange={(e) => {
                   const serviceId = e.target.value;
-                  updateLineItem(item.key, { serviceId, serviceOptionId: "", therapistId: "", packageId: "" });
+                  updateServiceLine(item.key, { serviceId, serviceOptionId: "", therapistId: "", packageId: "" });
                   if (serviceId) loadTherapists(serviceId);
                 }}
               >
@@ -212,7 +316,7 @@ export function Checkout({
               {service && (
                 <Select
                   value={item.serviceOptionId}
-                  onChange={(e) => updateLineItem(item.key, { serviceOptionId: e.target.value })}
+                  onChange={(e) => updateServiceLine(item.key, { serviceOptionId: e.target.value })}
                 >
                   <option value="">เลือกระยะเวลา</option>
                   {service.options.map((o) => (
@@ -226,7 +330,7 @@ export function Checkout({
               {item.serviceId && (
                 <Select
                   value={item.therapistId}
-                  onChange={(e) => updateLineItem(item.key, { therapistId: e.target.value })}
+                  onChange={(e) => updateServiceLine(item.key, { therapistId: e.target.value })}
                 >
                   <option value="">เลือกหมอนวด</option>
                   {therapists.map((t) => (
@@ -240,7 +344,7 @@ export function Checkout({
               {packages.length > 0 && (
                 <Select
                   value={item.packageId}
-                  onChange={(e) => updateLineItem(item.key, { packageId: e.target.value })}
+                  onChange={(e) => updateServiceLine(item.key, { packageId: e.target.value })}
                 >
                   <option value="">ชำระด้วยเงิน/โอน/บัตร</option>
                   {packages.map((p) => (
@@ -249,6 +353,20 @@ export function Checkout({
                     </option>
                   ))}
                 </Select>
+              )}
+
+              {item.therapistId && (
+                <label className="flex items-center gap-2 text-text-secondary">
+                  ทิปให้หมอนวด (บาท)
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={item.tipAmount}
+                    onChange={(e) => updateServiceLine(item.key, { tipAmount: e.target.value })}
+                    className="w-24 rounded-lg border border-border px-2 py-1"
+                  />
+                </label>
               )}
 
               {option && (
@@ -270,24 +388,45 @@ export function Checkout({
           );
         })}
 
-        <button
-          type="button"
-          onClick={addLineItem}
-          className="self-start rounded-xl border border-dashed border-border px-3.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-light"
-        >
-          + เพิ่มรายการ
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={addServiceLine}
+            className="flex-1 rounded-xl border border-dashed border-border px-3.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-light"
+          >
+            + เพิ่มบริการ
+          </button>
+          <button
+            type="button"
+            onClick={addProductLine}
+            className="flex-1 rounded-xl border border-dashed border-border px-3.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-light"
+          >
+            + เพิ่มสินค้า
+          </button>
+        </div>
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
-        ส่วนลด (บาท)
+        รหัสส่วนลด (ไม่บังคับ)
+        <input
+          type="text"
+          value={voucherCode}
+          onChange={(e) => setVoucherCode(e.target.value)}
+          placeholder="เช่น SUMMER10"
+          className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+        ส่วนลด (บาท) — ใช้เมื่อไม่มีรหัสส่วนลดด้านบน
         <input
           type="number"
           min={0}
           step="0.01"
           value={discountAmount}
+          disabled={voucherCode.trim().length > 0}
           onChange={(e) => setDiscountAmount(e.target.value)}
-          className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10"
+          className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-gray-50 disabled:text-gray-400"
         />
       </label>
 
@@ -307,6 +446,15 @@ export function Checkout({
           <span className="text-text-secondary">ยอดรวม</span>
           <span className="text-gray-900">฿{subtotal.toFixed(2)}</span>
         </div>
+        {tipTotal > 0 && (
+          <div className="flex justify-between">
+            <span className="text-text-secondary">ทิปรวม</span>
+            <span className="text-gray-900">฿{tipTotal.toFixed(2)}</span>
+          </div>
+        )}
+        {voucherCode.trim() && (
+          <p className="text-xs text-text-secondary">* ส่วนลดจากรหัส &quot;{voucherCode.trim()}&quot; จะคำนวณตอนกดรับชำระเงิน</p>
+        )}
         <div className="flex justify-between">
           <span className="text-text-secondary">ยอดสุทธิ (รวม VAT {vatAmount.toFixed(2)} บาท)</span>
           <span className="text-base font-semibold text-gray-900">฿{totalAmount.toFixed(2)}</span>

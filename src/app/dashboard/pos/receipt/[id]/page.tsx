@@ -36,7 +36,8 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
     include: {
       branch: true,
       cashier: true,
-      items: { include: { serviceOption: { include: { service: true } }, therapist: true } },
+      voucher: true,
+      items: { include: { serviceOption: { include: { service: true } }, product: true, therapist: true } },
     },
   });
   if (!transaction || transaction.deletedAt) notFound();
@@ -79,10 +80,17 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             <div key={item.id} className="flex justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-gray-900">
-                  {item.serviceOption.service.name} ({item.serviceOption.durationMinutes} นาที)
+                  {item.serviceOption
+                    ? `${item.serviceOption.service.name} (${item.serviceOption.durationMinutes} นาที)`
+                    : item.product?.name}
                   {item.quantity > 1 ? ` x${item.quantity}` : ""}
                 </p>
-                <p className="text-xs text-text-secondary">หมอนวด: {item.therapist?.nickname ?? "-"}</p>
+                {item.serviceOption && (
+                  <p className="text-xs text-text-secondary">หมอนวด: {item.therapist?.nickname ?? "-"}</p>
+                )}
+                {Number(item.tipAmount) > 0 && (
+                  <p className="text-xs text-text-secondary">ทิป: ฿{item.tipAmount.toString()}</p>
+                )}
               </div>
               <span className="shrink-0 text-gray-900">฿{item.lineTotal.toString()}</span>
             </div>
@@ -96,8 +104,16 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
           </div>
           {Number(transaction.discountAmount) > 0 && (
             <div className="flex justify-between">
-              <span className="text-text-secondary">ส่วนลด</span>
+              <span className="text-text-secondary">
+                ส่วนลด{transaction.voucher ? ` (โค้ด ${transaction.voucher.code})` : ""}
+              </span>
               <span className="text-gray-900">-฿{transaction.discountAmount.toString()}</span>
+            </div>
+          )}
+          {Number(transaction.tipTotal) > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">ทิปรวม</span>
+              <span className="text-gray-900">฿{transaction.tipTotal.toString()}</span>
             </div>
           )}
           <div className="flex justify-between text-xs text-gray-400">

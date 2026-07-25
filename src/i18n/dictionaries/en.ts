@@ -39,9 +39,11 @@ const en: Dictionary = {
     customers: "Customers",
     therapists: "Therapists",
     services: "Services",
+    products: "Add-on products",
     reports: "Reports",
     branches: "Branches",
     staff: "Staff",
+    vouchers: "Vouchers",
   },
   home: {
     title: "Massage Shop Management",
