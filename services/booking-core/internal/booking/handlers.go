@@ -51,14 +51,19 @@ func (h *Handlers) getAvailability(c *fiber.Ctx) error {
 }
 
 type createBookingRequest struct {
-	BranchID        string  `json:"branchId"`
-	ServiceOptionID string  `json:"serviceOptionId"`
-	TherapistID     string  `json:"therapistId"`
-	Date            string  `json:"date"`
-	Time            string  `json:"time"`
-	GuestName       string  `json:"guestName"`
-	GuestPhone      *string `json:"guestPhone"`
-	Source          string  `json:"source"`
+	BranchID        string `json:"branchId"`
+	ServiceOptionID string `json:"serviceOptionId"`
+	TherapistID     string `json:"therapistId"`
+	Date            string `json:"date"`
+	Time            string `json:"time"`
+	Source          string `json:"source"`
+	// Channel + ChannelUserID set together = a channel-linked customer (e.g. /book-now sends
+	// Channel="WEB", ChannelUserID=the OTP-verified phone) — upserted into `customers` and linked
+	// via channel_customer_id. Both empty = the legacy guest_name/guest_phone path instead.
+	Channel       string  `json:"channel"`
+	ChannelUserID string  `json:"channelUserId"`
+	GuestName     string  `json:"guestName"`
+	GuestPhone    *string `json:"guestPhone"`
 }
 
 func (h *Handlers) createBooking(c *fiber.Ctx) error {
@@ -78,9 +83,13 @@ func (h *Handlers) createBooking(c *fiber.Ctx) error {
 		TherapistID:     req.TherapistID,
 		Date:            req.Date,
 		Time:            req.Time,
-		GuestName:       req.GuestName,
-		GuestPhone:      req.GuestPhone,
 		Source:          req.Source,
+		Customer: CustomerIdentity{
+			Channel:       req.Channel,
+			ChannelUserID: req.ChannelUserID,
+			Name:          req.GuestName,
+			Phone:         req.GuestPhone,
+		},
 	})
 	if err != nil {
 		if errors.Is(err, ErrSlotTaken) {

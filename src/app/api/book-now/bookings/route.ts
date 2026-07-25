@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { BookingSource } from "@/generated/prisma/client";
 import { normalizeThaiMobile } from "@/lib/phone";
 import { verifyGuestPhoneToken } from "@/lib/guest-phone-token";
 import { checkRateLimit } from "@/lib/rate-limit";
-import {
-  BookingValidationError,
-  Channel,
-  SlotTakenError,
-  createBooking,
-} from "@/lib/booking-service";
+import { BookingValidationError, SlotTakenError } from "@/lib/booking-service";
+import { createBookingViaCore } from "@/lib/booking-core-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,8 +31,9 @@ type CreateGuestBookingBody = {
 /// Creates a booking for a guest with no account (public /book-now, no login) — the "identity" is
 /// a phone number OTP-verified moments earlier via /api/book-now/otp/*, proven here by
 /// `phoneToken` rather than trusting the client-supplied `phone` outright (coding rule #5,
-/// extended to this channel). Delegates all overlap protection, customer upsert, and audit
-/// logging to the same channel-agnostic createBooking used by every other entry point.
+/// extended to this channel). Delegates overlap protection, customer upsert, and audit logging to
+/// services/booking-core (the Go/Fiber Phase 1 service) via createBookingViaCore — see the Phase 2
+/// plan for why this moved off the TypeScript createBooking in booking-service.ts.
 export async function POST(request: Request) {
   let body: CreateGuestBookingBody;
   try {
@@ -90,16 +86,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const booking = await createBooking({
+    const booking = await createBookingViaCore({
       branchId: body.branchId as string,
       serviceOptionId: body.serviceOptionId as string,
       therapistId: isNonEmptyString(body.therapistId) ? body.therapistId : null,
       date: body.date as string,
       time: body.time as string,
-      source: BookingSource.ONLINE,
+      source: "ONLINE",
       customer: {
-        type: "channel",
-        channel: Channel.WEB,
+        channel: "WEB",
         channelUserId: phone,
         name: (body.guestName as string).trim(),
         phone,

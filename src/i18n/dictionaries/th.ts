@@ -33,6 +33,7 @@ const th = {
     dashboard: "แดชบอร์ดคิว",
     pos: "POS / ชำระเงิน",
     bookings: "รายการจอง",
+    bookingLinks: "ลิงก์จอง & QR",
     customers: "ลูกค้า",
     therapists: "จัดการหมอนวด",
     services: "จัดการบริการ",
@@ -317,6 +318,20 @@ const th = {
     rescheduling: "กำลังเลื่อนนัด...",
     rescheduleSuccess: "เลื่อนนัดสำเร็จ",
     newBookingCodeLabel: "รหัสการจองใหม่",
+  },
+  bookingLinks: {
+    title: "ลิงก์จอง & QR",
+    description: "สร้างลิงก์แชร์สำหรับ /book-now — เลือกสาขา (และบริการ/โปรโมชั่นถ้าต้องการให้ลูกค้าไม่ต้องเลือกเอง)",
+    branchLabel: "สาขา",
+    serviceOptionLabel: "บริการ (ไม่บังคับ — เว้นว่างถ้าอยากให้ลูกค้าเลือกเอง)",
+    noServiceOption: "ไม่ระบุ (ลูกค้าเลือกบริการเอง)",
+    shopLinkTitle: "ลิงก์ร้าน",
+    shopLinkDescription: "ลิงก์คงที่ของสาขา ใช้แปะโปรไฟล์/ประชาสัมพันธ์ทั่วไป",
+    serviceLinkTitle: "ลิงก์เฉพาะบริการ/โปรโมชั่น",
+    serviceLinkDescription: "พรีเซ็ตบริการไว้แล้ว ลูกค้ากดแล้วข้ามไปเลือกหมอนวด/เวลาได้เลย",
+    copyLink: "คัดลอกลิงก์",
+    copied: "คัดลอกแล้ว",
+    downloadQr: "ดาวน์โหลด QR",
   },
 };
 

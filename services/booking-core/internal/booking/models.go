@@ -41,18 +41,35 @@ var (
 	ErrNotFound = errors.New("booking: not found")
 )
 
+// CustomerIdentity is who a booking is for. Exactly one shape is expected at a time, mirroring
+// BookingCustomerIdentity's "channel" variant in src/lib/booking-service.ts:
+//   - Channel + ChannelUserID set: upserts a `customers` row keyed by (channel, channel_user_id)
+//     and links it via the booking's channel_customer_id — used by /book-now (Channel="WEB",
+//     ChannelUserID=the OTP-verified phone) today, and by Phase 3's LINE/WhatsApp adapters later,
+//     so channel-based bookings only need to be created one way, not reimplemented per channel.
+//   - Channel empty: Name/Phone are written directly onto the booking's guest_name/guest_phone
+//     columns instead — the legacy phone-in/no-identity-system path.
+type CustomerIdentity struct {
+	Channel       string
+	ChannelUserID string
+	Name          string
+	Phone         *string
+}
+
 type Booking struct {
-	ID              string
-	BranchID        string
-	ServiceOptionID string
-	TherapistID     *string
-	GuestName       string
-	GuestPhone      *string
-	Code            string
-	StartTime       time.Time
-	EndTime         time.Time
-	Status          Status
-	Source          string
+	ID                string
+	BranchID          string
+	ServiceOptionID   string
+	TherapistID       *string
+	GuestName         *string
+	GuestPhone        *string
+	Channel           *string
+	ChannelCustomerID *string
+	Code              string
+	StartTime         time.Time
+	EndTime           time.Time
+	Status            Status
+	Source            string
 }
 
 type TimeRange struct {

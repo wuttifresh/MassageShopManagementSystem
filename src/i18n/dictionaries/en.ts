@@ -35,6 +35,7 @@ const en: Dictionary = {
     dashboard: "Queue dashboard",
     pos: "POS / Checkout",
     bookings: "Bookings",
+    bookingLinks: "Booking links & QR",
     customers: "Customers",
     therapists: "Therapists",
     services: "Services",
@@ -319,6 +320,20 @@ const en: Dictionary = {
     rescheduling: "Rescheduling...",
     rescheduleSuccess: "Booking rescheduled",
     newBookingCodeLabel: "New booking code",
+  },
+  bookingLinks: {
+    title: "Booking links & QR",
+    description: "Generate share links for /book-now — pick a branch (and a service/promo, if you want customers to skip picking one)",
+    branchLabel: "Branch",
+    serviceOptionLabel: "Service (optional — leave blank to let customers choose)",
+    noServiceOption: "None (customer picks a service)",
+    shopLinkTitle: "Shop link",
+    shopLinkDescription: "A stable per-branch link — put it on your profile/general marketing",
+    serviceLinkTitle: "Service/promo link",
+    serviceLinkDescription: "Preselects the service — customers jump straight to picking a therapist/time",
+    copyLink: "Copy link",
+    copied: "Copied",
+    downloadQr: "Download QR",
   },
 };
 
