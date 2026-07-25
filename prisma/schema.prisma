@@ -129,6 +129,9 @@ enum MembershipTier {
 enum Channel {
   LINE
   WHATSAPP
+  /// Public web booking with no account/login (see /book-now) — the customer's phone number,
+  /// verified via a WhatsApp OTP challenge, is the channelUserId (normalized E.164).
+  WEB
 
   @@map("channel")
 }
@@ -223,6 +226,28 @@ model Customer {
 
   @@unique([channel, channelUserId])
   @@map("customers")
+}
+
+/// Ephemeral OTP challenge used to verify a guest's phone number before /book-now (public web
+/// booking, no account) will create a Booking on their behalf — see src/lib/phone-otp.ts. Not a
+/// financial/booking record, so no soft-delete: rows are just left to expire and can be purged
+/// freely. `codeHash` only, never the raw code, in case this table is ever exposed via a bug.
+model PhoneOtpChallenge {
+  id String @id @default(cuid())
+
+  /// Normalized E.164, e.g. +66812345678 — see src/lib/phone.ts.
+  phone      String
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  /// Set once a `phoneToken` has been issued for this challenge — prevents replaying the same
+  /// OTP code to mint a second token after the first one already succeeded.
+  consumedAt DateTime? @map("consumed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([phone, createdAt])
+  @@map("phone_otp_challenges")
 }
 
 /// A physical shop location. All operational data (bookings, queue, transactions) is scoped here.
