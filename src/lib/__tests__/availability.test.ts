@@ -6,10 +6,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // vi.hoisted() is required (rather than plain top-level consts) because vi.mock() factories
 // below are hoisted above everything else in the file, including normal variable declarations —
 // this is Vitest's documented pattern for referencing mock fns from within a vi.mock() factory.
-const { therapistScheduleFindUnique, bookingFindMany, therapistFindMany } = vi.hoisted(() => ({
+const { therapistScheduleFindUnique, bookingFindMany, therapistFindMany, therapistTimeBlockFindMany } = vi.hoisted(() => ({
   therapistScheduleFindUnique: vi.fn(),
   bookingFindMany: vi.fn(),
   therapistFindMany: vi.fn(),
+  therapistTimeBlockFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     therapistSchedule: { findUnique: therapistScheduleFindUnique },
     booking: { findMany: bookingFindMany },
     therapist: { findMany: therapistFindMany },
+    therapistTimeBlock: { findMany: therapistTimeBlockFindMany },
   },
 }));
 
@@ -34,6 +36,7 @@ beforeEach(() => {
   therapistScheduleFindUnique.mockReset();
   bookingFindMany.mockReset();
   therapistFindMany.mockReset();
+  therapistTimeBlockFindMany.mockReset().mockResolvedValue([]);
 });
 
 describe("getTherapistSlots (slot calculation)", () => {
@@ -83,6 +86,21 @@ describe("getTherapistSlots (overlap detection)", () => {
     // 10:00 and 10:30 both end by 11:30 at the latest... 10:30 would run 10:30–11:30, which
     // overlaps the 11:00–12:00 booking, so only 10:00 (10:00–11:00, touches but doesn't overlap)
     // and 12:00 (12:00–13:00, right after the booking ends) should remain.
+    expect(hhmm).toEqual(["10:00", "12:00"]);
+  });
+});
+
+describe("getTherapistSlots (time blocks — Phase 5)", () => {
+  it("excludes slots that would overlap a blocked range (e.g. a lunch break) exactly like a booking", async () => {
+    therapistScheduleFindUnique.mockResolvedValue({ status: "WORKING", startTime: "10:00", endTime: "13:00" });
+    bookingFindMany.mockResolvedValue([]);
+    therapistTimeBlockFindMany.mockResolvedValue([{ startTime: "11:00", endTime: "12:00" }]);
+
+    const slots = await getTherapistSlots("therapist-1", futureDate(3), 60);
+    const hhmm = slots.map((s) => `${String(s.getUTCHours()).padStart(2, "0")}:${String(s.getUTCMinutes()).padStart(2, "0")}`);
+
+    // Same shape as the booking-overlap test above — a block holds the therapist's time exactly
+    // like a booking would.
     expect(hhmm).toEqual(["10:00", "12:00"]);
   });
 });

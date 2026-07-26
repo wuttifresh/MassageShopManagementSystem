@@ -73,11 +73,11 @@ func (s *Service) GetTherapistSlots(ctx context.Context, therapistID string, dat
 	if window == nil {
 		return nil, nil
 	}
-	booked, err := getBookedRanges(ctx, s.pool, therapistID, date)
+	busy, err := getBusyRanges(ctx, s.pool, therapistID, date)
 	if err != nil {
 		return nil, err
 	}
-	return generateCandidateSlots(*window, durationMinutes, booked, time.Now().UTC()), nil
+	return generateCandidateSlots(*window, durationMinutes, busy, time.Now().UTC()), nil
 }
 
 // GetAvailableSlots is the "คนไหนก็ได้" (any therapist) union used by the public availability
@@ -261,12 +261,12 @@ func (s *Service) attemptCreate(ctx context.Context, in CreateInput, so ServiceO
 			continue
 		}
 
-		booked, err := getBookedRanges(ctx, tx, candidate.ID, startTime.Truncate(24*time.Hour))
+		busy, err := getBusyRanges(ctx, tx, candidate.ID, startTime.Truncate(24*time.Hour))
 		if err != nil {
 			return Booking{}, err
 		}
 		free := true
-		for _, r := range booked {
+		for _, r := range busy {
 			if rangesOverlap(startTime, endTime, r.Start, r.End) {
 				free = false
 				break

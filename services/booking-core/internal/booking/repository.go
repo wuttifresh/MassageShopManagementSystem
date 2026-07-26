@@ -153,6 +153,54 @@ func getBookedRanges(ctx context.Context, ex Executor, therapistID string, date 
 	return out, rows.Err()
 }
 
+// getTimeBlockRanges returns a therapist's blocked sub-ranges on `date` (Phase 5 — lunch break, a
+// personal appointment, etc.), stored as "HH:mm" strings — mirrors getTimeBlockRanges in
+// src/lib/availability.ts. Treated exactly like a booking by the caller's overlap check.
+func getTimeBlockRanges(ctx context.Context, ex Executor, therapistID string, date time.Time) ([]TimeRange, error) {
+	rows, err := ex.Query(ctx, `
+		SELECT start_time, end_time FROM therapist_time_blocks
+		WHERE therapist_id = $1 AND date = $2`,
+		therapistID, date,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []TimeRange
+	for rows.Next() {
+		var startStr, endStr string
+		if err := rows.Scan(&startStr, &endStr); err != nil {
+			return nil, err
+		}
+		start, err := combineDateAndTime(date, startStr)
+		if err != nil {
+			return nil, err
+		}
+		end, err := combineDateAndTime(date, endStr)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, TimeRange{Start: start, End: end})
+	}
+	return out, rows.Err()
+}
+
+// getBusyRanges is every range that holds a therapist's time on `date` — active bookings and time
+// blocks combined, mirroring getBusyRanges in src/lib/availability.ts. The one place both are
+// merged, so GetTherapistSlots/attemptCreate never have to know there are two separate sources.
+func getBusyRanges(ctx context.Context, ex Executor, therapistID string, date time.Time) ([]TimeRange, error) {
+	booked, err := getBookedRanges(ctx, ex, therapistID, date)
+	if err != nil {
+		return nil, err
+	}
+	blocked, err := getTimeBlockRanges(ctx, ex, therapistID, date)
+	if err != nil {
+		return nil, err
+	}
+	return append(booked, blocked...), nil
+}
+
 // lockTherapistForBooking serializes every concurrent booking attempt for this therapist within
 // the current transaction via a Postgres advisory lock keyed by therapist id — this is the "row
 // lock ตอน confirm" the Phase 1 brief asks for. It's released automatically when the transaction

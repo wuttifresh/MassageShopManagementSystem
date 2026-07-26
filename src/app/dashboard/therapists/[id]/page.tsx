@@ -29,7 +29,10 @@ export default async function EditTherapistPage({ params }: { params: { id: stri
       <PageHeader backHref="/dashboard/therapists" title="แก้ไขข้อมูลหมอนวด" />
 
       <LinkButton variant="outline" href={`/dashboard/therapists/${therapist.id}/schedule`} fullWidth>
-        จัดการตารางเวร / วันหยุด
+        จัดการตารางเวร / วันหยุด / บล็อกเวลา
+      </LinkButton>
+      <LinkButton variant="outline" href={`/dashboard/therapists/${therapist.id}/calendar`} fullWidth>
+        ดูปฏิทินรายวัน
       </LinkButton>
 
       <Card>

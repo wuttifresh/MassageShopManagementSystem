@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/session";
 import { ScheduleEditor } from "./schedule-editor";
+import { TimeBlockManager } from "./time-block-manager";
 import { PageHeader } from "@/components/ui/page-header";
+import { LinkButton } from "@/components/ui/link-button";
 
 const DAY_COUNT = 14;
 
@@ -32,6 +34,18 @@ export default async function TherapistSchedulePage({ params }: { params: { id: 
   });
   const schedulesByDate = new Map(schedules.map((s) => [isoDate(s.date), s]));
 
+  const timeBlocks = await prisma.therapistTimeBlock.findMany({
+    where: { therapistId: therapist.id, date: { gte: days[0] } },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
+  const initialBlocks = timeBlocks.map((b) => ({
+    id: b.id,
+    date: isoDate(b.date),
+    startTime: b.startTime,
+    endTime: b.endTime,
+    reason: b.reason,
+  }));
+
   const initialDays = days.map((d) => {
     const iso = isoDate(d);
     const existing = schedulesByDate.get(iso);
@@ -46,7 +60,11 @@ export default async function TherapistSchedulePage({ params }: { params: { id: 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-5">
       <PageHeader backHref={`/dashboard/therapists/${therapist.id}`} title={`ตารางเวร: ${therapist.nickname}`} />
+      <LinkButton variant="outline" href={`/dashboard/therapists/${therapist.id}/calendar`} fullWidth>
+        ดูปฏิทินรายวัน
+      </LinkButton>
       <ScheduleEditor therapistId={therapist.id} initialDays={initialDays} />
+      <TimeBlockManager therapistId={therapist.id} initialBlocks={initialBlocks} />
     </div>
   );
 }
