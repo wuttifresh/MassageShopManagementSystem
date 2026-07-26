@@ -100,6 +100,36 @@ endpoint จะเปิดสาธารณะ **ห้ามปล่อย�
   - `CRON_SECRET` — ค่าเดียวกับที่ตั้งใน Vercel
   - `APP_URL` — URL production เช่น `https://your-shop.vercel.app`
 
+## 5. Deploy Go booking-core service (Phase 1) ไป Fly.io
+
+`services/booking-core` เป็น standalone Go/Fiber service (persistent server, ไม่ใช่ serverless
+function) — deploy แยกจาก Next.js app ไป Fly.io เพราะ Vercel ไม่รองรับ persistent server แบบนี้
+ตรงๆ (`services/booking-core/Dockerfile`/`fly.toml` เตรียมไว้ให้แล้ว)
+
+1. ติดตั้ง Fly CLI: `curl -L https://fly.io/install.sh | sh` แล้ว `fly auth login`
+   (ต้องสมัคร Fly.io account ก่อน ต้องผูกบัตรเครดิตแม้จะอยู่ใน free allowance)
+2. แก้ `app` name ใน `services/booking-core/fly.toml` ให้เป็นชื่อที่ยังไม่มีใครใช้ (Fly app name
+   ต้อง unique ทั่วโลก) — `massageshop-booking-core` เป็นแค่ placeholder
+3. จาก `services/booking-core/`:
+   ```bash
+   fly launch --no-deploy   # ยืนยันใช้ fly.toml/Dockerfile ที่มีอยู่แล้ว ไม่ต้องให้มัน generate ใหม่
+   fly secrets set DATABASE_URL="<Supabase pooled connection string เดียวกับที่ Vercel ใช้>"
+   fly deploy
+   ```
+4. เช็คว่า deploy สำเร็จ: `curl https://<app-name>.fly.dev/healthz` ต้องได้ `{"ok":true}`
+5. อัปเดต `BOOKING_CORE_URL` ใน Vercel Environment Variables (Production + Preview) ให้เป็น
+   `https://<app-name>.fly.dev` แล้ว redeploy Next.js app — `/book-now` และ webhook ของ
+   WhatsApp/LINE จะเริ่มเรียก service นี้แทนค่า `.env.example` ตอน local dev
+
+**หมายเหตุ**:
+- `fly.toml` ตั้ง `min_machines_running = 0` (auto-stop เมื่อไม่มี traffic) เพื่อประหยัดค่าใช้จ่าย
+  ให้ใกล้เคียงงบเดิมของโปรเจกต์ที่สุด แลกกับ cold start ~1 วินาทีตอน request แรกหลังไม่มีคนใช้สักพัก
+  ถ้า cold start กระทบ UX ลูกค้าจริง ให้เปลี่ยนเป็น `min_machines_running = 1` (จะมีค่าใช้จ่ายเพิ่ม
+  ต่อเนื่อง ประมาณ $2-5/เดือน สำหรับ `shared-cpu-1x`/256mb)
+- `DATABASE_URL` ต้องตั้งผ่าน `fly secrets set` เท่านั้น ห้ามใส่ใน `fly.toml` ตรงๆ (ไฟล์นั้น commit
+  เข้า repo ไม่ใช่ที่เก็บความลับ)
+- health check ของ Fly ยิงไปที่ `/healthz` ทุก 30 วินาทีตามที่ตั้งไว้ใน `fly.toml`
+
 ## Production checklist
 
 - [ ] `NEXTAUTH_SECRET` เป็นค่าที่ generate ใหม่ด้วย `openssl rand -base64 32` (ไม่ใช้ค่า dev)
@@ -116,3 +146,5 @@ endpoint จะเปิดสาธารณะ **ห้ามปล่อย�
 - [ ] เปิด Vercel/Supabase usage alerts เพื่อไม่ให้ค่าใช้จ่ายเกินงบโดยไม่รู้ตัว
 - [ ] ตรวจสอบว่า custom domain (ถ้ามี) ตั้งค่า HTTPS ถูกต้องผ่าน Vercel ก่อนอัปเดต `NEXTAUTH_URL`
       และ LINE callback URL ให้ตรงกัน
+- [ ] `BOOKING_CORE_URL` ใน Vercel ชี้ไปที่ Fly.io app จริง (`https://<app-name>.fly.dev`) ไม่ใช่
+      `http://127.0.0.1:8081` ที่ใช้ตอน local dev — ทดสอบด้วย `curl <url>/healthz` ก่อน
