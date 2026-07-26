@@ -100,6 +100,26 @@ describe("requestPhoneOtp", () => {
 });
 
 describe("verifyPhoneOtp", () => {
+  it("accepts the fixed debug code without touching the database when OTP_DEBUG_MODE=true", async () => {
+    process.env.OTP_DEBUG_MODE = "true";
+
+    const result = await verifyPhoneOtp("+66812345678", "000000");
+
+    expect(result).toEqual({ ok: true });
+    expect(challengeFindFirst).not.toHaveBeenCalled();
+    expect(challengeUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does not accept the debug code when OTP_DEBUG_MODE is unset, falling back to the real challenge lookup", async () => {
+    delete process.env.OTP_DEBUG_MODE;
+    challengeFindFirst.mockResolvedValue(null);
+
+    const result = await verifyPhoneOtp("+66812345678", "000000");
+
+    expect(result.ok).toBe(false);
+    expect(challengeFindFirst).toHaveBeenCalled();
+  });
+
   it("succeeds and consumes the challenge when the code matches", async () => {
     challengeFindFirst.mockResolvedValue({
       id: "challenge-1",
