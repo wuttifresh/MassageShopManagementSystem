@@ -64,6 +64,39 @@ describe("requestPhoneOtp", () => {
     expect(result).toEqual({ ok: false, error: expect.stringContaining("WA_OTP_TEMPLATE_NAME") });
     expect(sendWhatsAppTemplateMessage).not.toHaveBeenCalled();
   });
+
+  it("reports success without sending when OTP_DEBUG_MODE=true and no template is configured", async () => {
+    delete process.env.WA_OTP_TEMPLATE_NAME;
+    process.env.OTP_DEBUG_MODE = "true";
+    challengeCreate.mockResolvedValue({});
+
+    const result = await requestPhoneOtp("+66812345678");
+
+    expect(result).toEqual({ ok: true });
+    expect(sendWhatsAppTemplateMessage).not.toHaveBeenCalled();
+  });
+
+  it("reports success when OTP_DEBUG_MODE=true even if the real WhatsApp send fails", async () => {
+    process.env.WA_OTP_TEMPLATE_NAME = "otp_template";
+    process.env.OTP_DEBUG_MODE = "true";
+    challengeCreate.mockResolvedValue({});
+    sendWhatsAppTemplateMessage.mockResolvedValue({ ok: false, error: "template not approved" });
+
+    const result = await requestPhoneOtp("+66812345678");
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("still returns the real failure when OTP_DEBUG_MODE is unset, even with a template configured", async () => {
+    process.env.WA_OTP_TEMPLATE_NAME = "otp_template";
+    delete process.env.OTP_DEBUG_MODE;
+    challengeCreate.mockResolvedValue({});
+    sendWhatsAppTemplateMessage.mockResolvedValue({ ok: false, error: "template not approved" });
+
+    const result = await requestPhoneOtp("+66812345678");
+
+    expect(result).toEqual({ ok: false, error: "template not approved" });
+  });
 });
 
 describe("verifyPhoneOtp", () => {
