@@ -72,6 +72,7 @@ func setupFixture(t *testing.T, pool *pgxpool.Pool) testFixture {
 		mustExec(t, ctx, pool, `DELETE FROM bookings WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM customers WHERE channel_user_id LIKE 'test-%'`)
 		mustExec(t, ctx, pool, `DELETE FROM audit_logs WHERE branch_id = $1`, f.BranchID)
+		mustExec(t, ctx, pool, `DELETE FROM therapist_time_blocks WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM therapist_schedules WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM therapists WHERE branch_id = $1`, f.BranchID)
 		mustExec(t, ctx, pool, `DELETE FROM service_options WHERE service_id = $1`, f.ServiceID)
@@ -324,6 +325,49 @@ func TestGetAvailableSlots_ExcludesBookedRange(t *testing.T) {
 	}
 	if containsTime(after, "15:00") {
 		t.Errorf("15:00 should no longer be available after booking it")
+	}
+}
+
+// TestGetAvailableSlots_ExcludesTimeBlock proves the same overlap guard used for bookings also
+// applies to therapist_time_blocks (Phase 5 — lunch break, personal appointment, etc.), mirroring
+// the TS test in src/lib/__tests__/availability.test.ts ("excludes slots that would overlap a
+// blocked range ... exactly like a booking").
+func TestGetAvailableSlots_ExcludesTimeBlock(t *testing.T) {
+	pool := testPool(t)
+	f := setupFixture(t, pool)
+	svc := NewService(pool)
+	ctx := context.Background()
+
+	before, err := svc.GetAvailableSlots(ctx, f.BranchID, f.ServiceOptionID, f.TherapistID, f.Date)
+	if err != nil {
+		t.Fatalf("GetAvailableSlots (before): %v", err)
+	}
+	if !containsTime(before, "15:00") {
+		t.Fatalf("expected 15:00 to be free before blocking it")
+	}
+
+	mustExec(t, ctx, pool, `
+		INSERT INTO therapist_time_blocks (id, therapist_id, branch_id, date, start_time, end_time, updated_at)
+		VALUES ($1, $2, $3, $4, '15:00', '16:00', now())`,
+		uuid.NewString(), f.TherapistID, f.BranchID, f.Date)
+
+	after, err := svc.GetAvailableSlots(ctx, f.BranchID, f.ServiceOptionID, f.TherapistID, f.Date)
+	if err != nil {
+		t.Fatalf("GetAvailableSlots (after): %v", err)
+	}
+	if containsTime(after, "15:00") {
+		t.Errorf("15:00 should no longer be available once it falls inside a time block")
+	}
+
+	if _, err := svc.CreateBooking(ctx, CreateInput{
+		BranchID:        f.BranchID,
+		ServiceOptionID: f.ServiceOptionID,
+		TherapistID:     f.TherapistID,
+		Date:            f.Date.Format("2006-01-02"),
+		Time:            "15:00",
+		Customer:        CustomerIdentity{Name: "Somchai"},
+	}); !errors.Is(err, ErrSlotTaken) {
+		t.Errorf("expected CreateBooking to reject a slot inside a time block with ErrSlotTaken, got: %v", err)
 	}
 }
 

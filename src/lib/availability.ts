@@ -84,6 +84,28 @@ async function getBookedRanges(therapistId: string, date: Date): Promise<TimeRan
   return bookings.map((b) => ({ start: b.startTime, end: b.endTime }));
 }
 
+/// A therapist's blocked sub-ranges for one day (Phase 5) — lunch break, a personal appointment,
+/// etc. Treated exactly like a booking when computing free slots (see getBusyRanges below).
+async function getTimeBlockRanges(therapistId: string, date: Date): Promise<TimeRange[]> {
+  const blocks = await prisma.therapistTimeBlock.findMany({
+    where: { therapistId, date: dateOnly(date) },
+    select: { startTime: true, endTime: true },
+  });
+
+  return blocks.map((b) => ({
+    start: combineDateAndTime(date, b.startTime),
+    end: combineDateAndTime(date, b.endTime),
+  }));
+}
+
+/// Every range that holds a therapist's time on `date` — active bookings and time blocks
+/// combined. This is the one place both are merged, so getTherapistSlots/findAvailableTherapist
+/// never have to know there are two separate sources of "busy."
+async function getBusyRanges(therapistId: string, date: Date): Promise<TimeRange[]> {
+  const [booked, blocked] = await Promise.all([getBookedRanges(therapistId, date), getTimeBlockRanges(therapistId, date)]);
+  return [...booked, ...blocked];
+}
+
 function generateCandidateSlots(
   window: TimeRange,
   durationMinutes: number,
@@ -116,8 +138,8 @@ export async function getTherapistSlots(
   const window = await getWorkingWindow(therapistId, date);
   if (!window) return [];
 
-  const bookedRanges = await getBookedRanges(therapistId, date);
-  return generateCandidateSlots(window, durationMinutes, bookedRanges, new Date());
+  const busyRanges = await getBusyRanges(therapistId, date);
+  return generateCandidateSlots(window, durationMinutes, busyRanges, new Date());
 }
 
 /// Union of start times where at least one eligible therapist at the branch is free — used to
@@ -163,8 +185,8 @@ export async function findAvailableTherapist(
     const window = await getWorkingWindow(therapist.id, startTime);
     if (!window || startTime < window.start || endTime > window.end) continue;
 
-    const bookedRanges = await getBookedRanges(therapist.id, startTime);
-    const isFree = bookedRanges.every((r) => !rangesOverlap(startTime, endTime, r.start, r.end));
+    const busyRanges = await getBusyRanges(therapist.id, startTime);
+    const isFree = busyRanges.every((r) => !rangesOverlap(startTime, endTime, r.start, r.end));
     if (isFree) return therapist.id;
   }
 

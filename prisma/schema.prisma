@@ -269,15 +269,16 @@ model Branch {
   closeTime String  @default("22:00") @map("close_time")
   isActive  Boolean @default(true) @map("is_active")
 
-  users              User[]
-  therapists         Therapist[]
-  therapistSchedules TherapistSchedule[]
-  bookings           Booking[]
-  queues             Queue[]
-  transactions       Transaction[]
-  packages           Package[]
-  products           Product[]
-  auditLogs          AuditLog[]
+  users               User[]
+  therapists          Therapist[]
+  therapistSchedules  TherapistSchedule[]
+  therapistTimeBlocks TherapistTimeBlock[]
+  bookings            Booking[]
+  queues              Queue[]
+  transactions        Transaction[]
+  packages            Package[]
+  products            Product[]
+  auditLogs           AuditLog[]
 
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -361,6 +362,7 @@ model Therapist {
 
   specialties      TherapistService[]
   schedules        TherapistSchedule[]
+  timeBlocks       TherapistTimeBlock[]
   bookings         Booking[]
   queues           Queue[]
   transactionItems TransactionItem[]
@@ -406,6 +408,30 @@ model TherapistSchedule {
 
   @@unique([therapistId, date])
   @@map("therapist_schedules")
+}
+
+/// A blocked sub-range within an otherwise-WORKING day (Phase 5) — a lunch break, a personal
+/// appointment, a meeting — distinct from TherapistSchedule, which only marks the whole day
+/// WORKING/DAY_OFF/LEAVE. Both services/booking-core (Go) and src/lib/availability.ts (TS) must
+/// treat a block exactly like an existing Booking when computing free slots — see
+/// getTherapistSlots/findAvailableTherapist and the Go equivalent in internal/booking/repository.go.
+model TherapistTimeBlock {
+  id          String    @id @default(cuid())
+  therapistId String    @map("therapist_id")
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  branchId    String    @map("branch_id")
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  date      DateTime @db.Date
+  startTime String   @map("start_time")
+  endTime   String   @map("end_time")
+  reason    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([therapistId, date])
+  @@map("therapist_time_blocks")
 }
 
 // ─────────────────────────────────────────────────────────────────────────

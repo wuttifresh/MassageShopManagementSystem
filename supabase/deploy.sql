@@ -646,6 +646,33 @@ ALTER TABLE "transaction_items" ADD CONSTRAINT "transaction_items_product_id_fke
 ALTER TABLE "products" ADD CONSTRAINT "products_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ============================================================
+-- Migration: 20260726032906_add_therapist_time_blocks
+-- ============================================================
+-- CreateTable
+CREATE TABLE "therapist_time_blocks" (
+    "id" TEXT NOT NULL,
+    "therapist_id" TEXT NOT NULL,
+    "branch_id" TEXT NOT NULL,
+    "date" DATE NOT NULL,
+    "start_time" TEXT NOT NULL,
+    "end_time" TEXT NOT NULL,
+    "reason" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "therapist_time_blocks_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "therapist_time_blocks_therapist_id_date_idx" ON "therapist_time_blocks"("therapist_id", "date");
+
+-- AddForeignKey
+ALTER TABLE "therapist_time_blocks" ADD CONSTRAINT "therapist_time_blocks_therapist_id_fkey" FOREIGN KEY ("therapist_id") REFERENCES "therapists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "therapist_time_blocks" ADD CONSTRAINT "therapist_time_blocks_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ============================================================
 -- Prisma migration bookkeeping
 -- ============================================================
 -- Lets a future `prisma migrate deploy`/`dev` run recognize the migrations above as already
@@ -662,20 +689,22 @@ CREATE TABLE "_prisma_migrations" (
 );
 
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('766027dc-144f-40e7-858d-90814053e4e1', '0ebade7c20ad09ca7cd9f2e44fb1aabedb8fb7cfb8c5f7dc86ec682558d8ab25', now(), '20260701061535_init', now(), 1);
+VALUES ('c3ec4b45-a67a-4e75-a910-d019f010fbd2', '0ebade7c20ad09ca7cd9f2e44fb1aabedb8fb7cfb8c5f7dc86ec682558d8ab25', now(), '20260701061535_init', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('42c4769c-6ce5-4de7-95f8-6e075d601a00', 'd354452499689c7ed0f19bc535074cd79634889da7d4111bc385565b72433314', now(), '20260701075446_add_service_option_promo_price', now(), 1);
+VALUES ('396f276c-a864-459c-95f0-c9625c7c1c25', 'd354452499689c7ed0f19bc535074cd79634889da7d4111bc385565b72433314', now(), '20260701075446_add_service_option_promo_price', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('03d33eda-1f4d-44e0-b649-04870491d3f8', '0ce7a62b1c9c83b7c4ace2d910a6cc9b60e1936784c99ce4f99ce6d8f60519f1', now(), '20260701090735_add_package_service_relation', now(), 1);
+VALUES ('32fb736c-fbda-414e-bfaa-c0c7d1fc95a7', '0ce7a62b1c9c83b7c4ace2d910a6cc9b60e1936784c99ce4f99ce6d8f60519f1', now(), '20260701090735_add_package_service_relation', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('19d78796-d0f6-4be2-a4cc-bbae7c77dcab', '15679d9e1cd6c27c0885173b6bc1399bc79fead79a0b80dfbf3f4b49b3451bb5', now(), '20260701101450_add_booking_reminder_sent_at', now(), 1);
+VALUES ('944fda89-5ee5-4e3f-b9cc-df7b6e1a4a6b', '15679d9e1cd6c27c0885173b6bc1399bc79fead79a0b80dfbf3f4b49b3451bb5', now(), '20260701101450_add_booking_reminder_sent_at', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('578f300c-0412-4ec2-97d7-47d0b2b63a87', '55665f12770186455aff9d13f6cacc87342985c2ae8fc995154c4ab9e057279d', now(), '20260703120000_add_multichannel_customer', now(), 1);
+VALUES ('bd694c4c-3c49-4354-b5f4-e29544496d1b', '55665f12770186455aff9d13f6cacc87342985c2ae8fc995154c4ab9e057279d', now(), '20260703120000_add_multichannel_customer', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('316d0604-2622-4304-bf41-725d54695c4b', '8c64ec15524e838d01ddaf189d27812df726fe069bb9722147d13eaba0f2cf14', now(), '20260703180000_add_send_notification_audit_action', now(), 1);
+VALUES ('7a3ecbfb-bb35-4948-ab2a-856dc987dce9', '8c64ec15524e838d01ddaf189d27812df726fe069bb9722147d13eaba0f2cf14', now(), '20260703180000_add_send_notification_audit_action', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('90aba6d7-c42a-4e47-b78d-0e33864a7e8f', '9272a343cea396abdd81c1e9e4991e1d8bf0762345aff8eee37dedca0dd2167c', now(), '20260725165611_add_web_channel_and_phone_otp', now(), 1);
+VALUES ('9c327e3a-d6d7-41cf-92d6-6e33c43c138b', '9272a343cea396abdd81c1e9e4991e1d8bf0762345aff8eee37dedca0dd2167c', now(), '20260725165611_add_web_channel_and_phone_otp', now(), 1);
 INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
-VALUES ('3383d28b-1bca-45c3-ba14-f677cd259dc9', 'a4d9bb1d9f66390a4ddfcfa5fc3d3f17b352372815150ebc0b53da090d0ea039', now(), '20260725182956_add_products_vouchers_tips', now(), 1);
+VALUES ('b2fbb757-0ae7-4de0-a9ec-f3a1448b62d8', 'a4d9bb1d9f66390a4ddfcfa5fc3d3f17b352372815150ebc0b53da090d0ea039', now(), '20260725182956_add_products_vouchers_tips', now(), 1);
+INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "started_at", "applied_steps_count")
+VALUES ('bc7e2475-d927-4f2c-8236-35137ad90110', '84b325bec254b17d5fa78f92c47c2481317ccc9a7e7d0d39161d3d6afeaf7c83', now(), '20260726032906_add_therapist_time_blocks', now(), 1);
 
 COMMIT;

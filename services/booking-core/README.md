@@ -9,8 +9,26 @@ its own migrations or own a separate schema.
 availability + create, via `src/lib/booking-core-client.ts` proxied through
 `/api/book-now/availability` and `/api/book-now/bookings` — `BOOKING_CORE_URL` in `.env.example`.
 Cancel/reschedule/lookup for `/book-now` still go through the TypeScript `booking-service.ts`
-directly (unchanged) — only availability + create moved. LINE/WhatsApp channel adapters (Phase 3)
-are still not wired up.
+directly (unchanged) — only availability + create moved.
+
+**Phase 3 update**: WhatsApp/LINE webhooks (`src/app/api/whatsapp/webhook`,
+`src/app/api/line/webhook`) reply with a link to `/book-now` rather than calling this service
+directly yet — see `src/lib/channel-booking-adapter.ts` for the shared adapter both channels use.
+
+**Phase 4 update**: POS (`/dashboard/pos`) sells against the Prisma-side `Queue`/`Booking` records
+this service creates; it doesn't call this service directly.
+
+**Phase 5 update**: `therapist_time_blocks` (a therapist's blocked sub-ranges on one date — lunch
+break, a personal appointment, etc.) are now treated exactly like a booking when computing free
+slots, in both this service (`getBusyRanges` in `internal/booking/repository.go`, used by
+`GetAvailableSlots`/`CreateBooking`) and the TypeScript app (`getBusyRanges` in
+`src/lib/availability.ts`) — the two implementations are kept in lockstep by design, same as every
+other overlap rule here. Managed from `/dashboard/therapists/[id]/schedule` (add/list/delete) and
+visualized against a real day's bookings in `/dashboard/therapists/[id]/calendar`, which fetches
+bookings straight from Prisma (for customer/service detail this service's anonymous availability
+endpoint can't provide) and cross-checks the resulting free-slot list against `GET
+/v1/availability` on this service — proving the calendar view and this Phase 1 engine actually
+agree, not just that they're supposed to.
 
 ## Endpoints
 
@@ -65,3 +83,7 @@ point at a shared dev database.
 
 `TestCreateBooking_DoubleBookingRace` fires 20 concurrent `CreateBooking` calls at the exact same
 therapist/slot and asserts exactly one succeeds — the test this phase was written to prove.
+
+`TestGetAvailableSlots_ExcludesTimeBlock` (Phase 5) proves a `therapist_time_blocks` row narrows
+`GetAvailableSlots` and gets rejected by `CreateBooking` with `ErrSlotTaken` exactly like an
+existing booking would.
