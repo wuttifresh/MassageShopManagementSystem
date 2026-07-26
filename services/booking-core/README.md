@@ -69,6 +69,15 @@ export DATABASE_URL="postgresql://user:pass@host:5432/dbname"
 go run ./cmd/server        # listens on :8081 by default, override with PORT
 ```
 
+## Deploying
+
+This is a persistent Fiber server, not a serverless function — it doesn't fit Vercel (where the
+rest of the app runs). `Dockerfile`/`fly.toml` in this directory deploy it to Fly.io; see
+`DEPLOYMENT.md` at the repo root, section "5. Deploy Go booking-core service (Phase 1) ไป Fly.io",
+for the full walkthrough (`fly launch --no-deploy` → `fly secrets set DATABASE_URL=...` →
+`fly deploy`, then point the Next.js app's `BOOKING_CORE_URL` at the resulting `https://*.fly.dev`
+URL).
+
 ## Testing
 
 ```
