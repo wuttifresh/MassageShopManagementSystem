@@ -12,6 +12,10 @@ import type { SendResult } from "@/lib/send-result";
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_LENGTH = 6;
 const MAX_VERIFY_ATTEMPTS = 5;
+/// Fixed code accepted in place of the real one when OTP_DEBUG_MODE=true — lets a tester skip
+/// checking server logs for the actual code entirely. See requestPhoneOtp's doc comment for why
+/// this whole mode must never be enabled once real customers can reach /book-now.
+const DEBUG_MODE_CODE = "000000";
 
 function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -34,10 +38,12 @@ function generateCode(): string {
 /// OTP_DEBUG_MODE=true is an explicit, opt-in escape hatch for testing /book-now before the
 /// WhatsApp Business Authentication template is approved: it reports success (so the booking
 /// wizard proceeds to the code-entry step) even though no message was actually sent, with the
-/// code visible only in server logs — never in the API response. It must never be set once real
-/// customers can reach this endpoint: anyone could otherwise request an OTP for any phone number
-/// and read the code from server logs without ever possessing that phone. Remove the env var (or
-/// leave it unset) as soon as WA_MESSAGING_ACCESS_TOKEN/WA_PHONE_NUMBER_ID/WA_OTP_TEMPLATE_NAME
+/// code visible only in server logs — never in the API response. verifyPhoneOtp also accepts the
+/// fixed DEBUG_MODE_CODE ("000000") in this mode, so testing doesn't require reading logs at all.
+/// This means phone verification is effectively disabled while the flag is set — it must never be
+/// enabled once real customers can reach this endpoint: anyone could complete "verification" for
+/// any phone number just by typing 000000, without ever possessing that phone. Remove the env var
+/// (or leave it unset) as soon as WA_MESSAGING_ACCESS_TOKEN/WA_PHONE_NUMBER_ID/WA_OTP_TEMPLATE_NAME
 /// are all configured and delivering real messages.
 export async function requestPhoneOtp(phone: string): Promise<SendResult> {
   const code = generateCode();
@@ -71,6 +77,11 @@ export type VerifyPhoneOtpResult = { ok: true } | { ok: false; error: string };
 /// Checks `code` against the most recent, unexpired, unconsumed challenge for `phone`. Marks it
 /// consumed on success so the same code can't be reused to mint a second phoneToken later.
 export async function verifyPhoneOtp(phone: string, code: string): Promise<VerifyPhoneOtpResult> {
+  if (process.env.OTP_DEBUG_MODE === "true" && code === DEBUG_MODE_CODE) {
+    console.warn(`[phone-otp] OTP_DEBUG_MODE=true — accepted debug code ${DEBUG_MODE_CODE} for ${phone} without checking WhatsApp delivery`);
+    return { ok: true };
+  }
+
   const challenge = await prisma.phoneOtpChallenge.findFirst({
     where: { phone, consumedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
