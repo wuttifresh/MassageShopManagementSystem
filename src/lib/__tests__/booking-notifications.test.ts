@@ -1,17 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { sendLineMessage, sendWhatsAppTextMessage, logNotification } = vi.hoisted(() => ({
+const { sendLineMessage, logNotification } = vi.hoisted(() => ({
   sendLineMessage: vi.fn(),
-  sendWhatsAppTextMessage: vi.fn(),
   logNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/line-messaging", () => ({ sendLineMessage }));
-vi.mock("@/lib/whatsapp-messaging", () => ({ sendWhatsAppTextMessage }));
 vi.mock("@/lib/notification-log", () => ({ logNotification }));
-// booking-service.ts's own dependency chain (@/lib/prisma, instantiating a real PrismaClient) has
-// no reason to run for this suite — it only needs the Channel enum value.
-vi.mock("@/lib/booking-service", () => ({ Channel: { LINE: "LINE", WHATSAPP: "WHATSAPP" } }));
 
 import { notifyChannelBookingConfirmed } from "@/lib/booking-notifications";
 
@@ -20,7 +15,6 @@ const SUMMARY = { branchName: "สาขาสยาม", serviceName: "นว�
 
 beforeEach(() => {
   sendLineMessage.mockReset().mockResolvedValue({ ok: true });
-  sendWhatsAppTextMessage.mockReset().mockResolvedValue({ ok: true });
   logNotification.mockReset();
 });
 
@@ -29,7 +23,6 @@ describe("notifyChannelBookingConfirmed", () => {
     await notifyChannelBookingConfirmed(BOOKING, { type: "user", userId: "user-1" }, SUMMARY);
 
     expect(sendLineMessage).not.toHaveBeenCalled();
-    expect(sendWhatsAppTextMessage).not.toHaveBeenCalled();
     expect(logNotification).not.toHaveBeenCalled();
   });
 
@@ -41,7 +34,6 @@ describe("notifyChannelBookingConfirmed", () => {
     );
 
     expect(sendLineMessage).toHaveBeenCalledWith("U1234", expect.stringContaining("BK-ABCD"));
-    expect(sendWhatsAppTextMessage).not.toHaveBeenCalled();
     expect(logNotification).toHaveBeenCalledWith({
       channel: "LINE",
       type: "BOOKING_CONFIRMATION",
@@ -49,20 +41,6 @@ describe("notifyChannelBookingConfirmed", () => {
       bookingId: "booking-1",
       result: { ok: true },
     });
-  });
-
-  it("sends via WhatsApp text and logs it for a WhatsApp channel identity", async () => {
-    await notifyChannelBookingConfirmed(
-      BOOKING,
-      { type: "channel", channel: "WHATSAPP", channelUserId: "66812345678", name: "คุณสมชาย" },
-      SUMMARY
-    );
-
-    expect(sendWhatsAppTextMessage).toHaveBeenCalledWith("66812345678", expect.stringContaining("BK-ABCD"));
-    expect(sendLineMessage).not.toHaveBeenCalled();
-    expect(logNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "WHATSAPP", recipient: "66812345678", bookingId: "booking-1" })
-    );
   });
 
   it("logs a failed send with its error message", async () => {

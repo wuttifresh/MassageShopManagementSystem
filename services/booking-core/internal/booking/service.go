@@ -1,6 +1,6 @@
 // Package booking is the channel-agnostic booking core (Phase 1 of the migration plan) —
 // slot availability, create, and cancel, backed by the same Postgres database and schema the
-// existing Next.js/Prisma app uses. Nothing here talks to WhatsApp/LINE/HTTP directly; Phase 3's
+// existing Next.js/Prisma app uses. Nothing here talks to LINE/HTTP directly; Phase 3's
 // channel adapters call Create/Cancel/GetAvailableSlots, they don't reimplement booking logic.
 package booking
 

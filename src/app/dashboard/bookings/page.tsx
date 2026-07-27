@@ -21,7 +21,6 @@ function resolveChannelKey(booking: { channel: string | null; source: string }):
 
 const CHANNEL_LABEL: Record<BookingChannelKey, string> = {
   LINE: "LINE",
-  WHATSAPP: "WhatsApp",
   ONLINE: "เว็บไซต์",
   WALK_IN: "หน้าร้าน",
   PHONE: "โทรศัพท์",
@@ -30,7 +29,6 @@ const CHANNEL_LABEL: Record<BookingChannelKey, string> = {
 
 const CHANNEL_BADGE_VARIANT: Record<BookingChannelKey, BadgeVariant> = {
   LINE: "success",
-  WHATSAPP: "success",
   ONLINE: "info",
   WALK_IN: "neutral",
   PHONE: "neutral",
@@ -61,7 +59,7 @@ function defaultDateRange(): { startDate: string; endDate: string } {
 /// which would silently under-count older matching bookings.
 function channelWhereClause(channel: BookingChannelKey | null) {
   if (!channel) return {};
-  if (channel === "LINE" || channel === "WHATSAPP") return { channel };
+  if (channel === "LINE") return { channel };
   return { channel: null, source: channel };
 }
 

@@ -3,9 +3,9 @@ import { getDictionary } from "@/i18n/get-dictionary";
 import { LanguageSwitcher } from "@/i18n/language-switcher";
 import { BookNowWizard } from "./booking-wizard";
 
-// Public web booking, no account/login required — a phone number OTP-verified via WhatsApp
-// (src/lib/phone-otp.ts) stands in for identity. See /book (retired in favor of WhatsApp-only)
-// and /liff/booking (LINE) for the other, session-based booking entry points.
+// Public web booking, no account/login required — a client-supplied phone number stands in for
+// identity, with no verification step. See /book (temporarily disabled) and /liff/booking (LINE)
+// for the other, session-based booking entry points.
 //
 // `?branch=<slug>` and `?option=<serviceOptionId>` preselect the branch/service+duration steps —
 // see /dashboard/booking-links (Phase 2) for where staff generate these share links + QR codes.

@@ -29,7 +29,7 @@ export type CreateBookingResult = { success: true; bookingId: string } | { succe
 /// Thin wrapper around the shared, channel-agnostic booking service (src/lib/booking-service.ts):
 /// this function's only remaining job is the web-specific concerns — checking the NextAuth
 /// session, and sending the existing LINE push notification — while the actual validation,
-/// overlap handling, and DB write live in one place shared with the LINE/WhatsApp entry points.
+/// overlap handling, and DB write live in one place shared with the LINE entry points.
 /// The public contract (inputs/outputs) is unchanged, so booking-wizard.tsx needed no changes.
 export async function createBooking(input: CreateBookingInput): Promise<CreateBookingResult> {
   const session = await getCurrentSession();

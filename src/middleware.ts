@@ -19,8 +19,8 @@ export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
 
-    // The customer web account portal is retired — customers are served through WhatsApp only
-    // now (LINE login was its only auth path and has been removed, see src/lib/auth.ts), but a
+    // The customer web account portal is retired (LINE login was its only auth path and has been
+    // removed, see src/lib/auth.ts) — customers book through /book-now instead, but a
     // still-valid JWT from before that change could otherwise keep reaching this page.
     if (pathname.startsWith("/account")) {
       return NextResponse.redirect(new URL("/", req.url));

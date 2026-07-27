@@ -135,9 +135,8 @@ enum MembershipTier {
 /// `channel` narrows "ONLINE" down to which surface the customer actually used.
 enum Channel {
   LINE
-  WHATSAPP
-  /// Public web booking with no account/login (see /book-now) — the customer's phone number,
-  /// verified via a WhatsApp OTP challenge, is the channelUserId (normalized E.164).
+  /// Public web booking with no account/login (see /book-now) — the customer's phone number, as
+  /// entered at booking time, is the channelUserId (normalized E.164).
   WEB
 
   @@map("channel")
@@ -206,20 +205,20 @@ model User {
   @@map("users")
 }
 
-/// Customer identity for the *new* multi-channel booking entry points (LINE LIFF, WhatsApp
-/// Flows) — see multi-channel-booking-prompt.md. Kept deliberately separate from `User`:
+/// Customer identity for the *new* multi-channel booking entry points (LINE LIFF, /book-now) —
+/// see multi-channel-booking-prompt.md. Kept deliberately separate from `User`:
 /// existing customers who sign in via LINE Login on the web already exist as
 /// `User(role: CUSTOMER, lineUserId: ...)`, and migrating that live data onto a new table was
 /// judged too risky to do blindly. So there are two customer identity sources side by side:
 ///   - `User(role: CUSTOMER)` — web customers via NextAuth LINE Login (existing, unchanged).
-///   - `Customer` — LIFF/WhatsApp customers, upserted by `(channel, channelUserId)` (new).
+///   - `Customer` — LIFF/`/book-now` customers, upserted by `(channel, channelUserId)` (new).
 /// A `Booking` may reference at most one of `customerId` (User) / `channelCustomerId` (Customer).
 model Customer {
   id String @id @default(cuid())
 
   channel       Channel
   /// LINE: the `sub` claim from the verified ID token (== LINE userId).
-  /// WhatsApp: the customer's wa_id (phone-number-scoped WhatsApp identifier).
+  /// WEB: the customer's normalized phone number (see src/lib/phone.ts).
   channelUserId String  @map("channel_user_id")
 
   name  String
@@ -233,28 +232,6 @@ model Customer {
 
   @@unique([channel, channelUserId])
   @@map("customers")
-}
-
-/// Ephemeral OTP challenge used to verify a guest's phone number before /book-now (public web
-/// booking, no account) will create a Booking on their behalf — see src/lib/phone-otp.ts. Not a
-/// financial/booking record, so no soft-delete: rows are just left to expire and can be purged
-/// freely. `codeHash` only, never the raw code, in case this table is ever exposed via a bug.
-model PhoneOtpChallenge {
-  id String @id @default(cuid())
-
-  /// Normalized E.164, e.g. +66812345678 — see src/lib/phone.ts.
-  phone      String
-  codeHash   String    @map("code_hash")
-  attempts   Int       @default(0)
-  expiresAt  DateTime  @map("expires_at")
-  /// Set once a `phoneToken` has been issued for this challenge — prevents replaying the same
-  /// OTP code to mint a second token after the first one already succeeded.
-  consumedAt DateTime? @map("consumed_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([phone, createdAt])
-  @@map("phone_otp_challenges")
 }
 
 /// A physical shop location. All operational data (bookings, queue, transactions) is scoped here.
@@ -452,7 +429,7 @@ model Booking {
   guestName  String? @map("guest_name")
   guestPhone String? @map("guest_phone")
 
-  /// Set only for bookings made through the new multi-channel entry points (LIFF/WhatsApp) —
+  /// Set only for bookings made through the new multi-channel entry points (LIFF/`/book-now`) —
   /// mutually exclusive with `customerId`. See the `Customer` model doc comment.
   channelCustomerId String?   @map("channel_customer_id")
   channelCustomer   Customer? @relation("BookingChannelCustomer", fields: [channelCustomerId], references: [id], onDelete: SetNull)

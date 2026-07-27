@@ -45,8 +45,8 @@ var (
 // BookingCustomerIdentity's "channel" variant in src/lib/booking-service.ts:
 //   - Channel + ChannelUserID set: upserts a `customers` row keyed by (channel, channel_user_id)
 //     and links it via the booking's channel_customer_id — used by /book-now (Channel="WEB",
-//     ChannelUserID=the OTP-verified phone) today, and by Phase 3's LINE/WhatsApp adapters later,
-//     so channel-based bookings only need to be created one way, not reimplemented per channel.
+//     ChannelUserID=the normalized phone) today, and by Phase 3's LINE adapters later, so
+//     channel-based bookings only need to be created one way, not reimplemented per channel.
 //   - Channel empty: Name/Phone are written directly onto the booking's guest_name/guest_phone
 //     columns instead — the legacy phone-in/no-identity-system path.
 type CustomerIdentity struct {

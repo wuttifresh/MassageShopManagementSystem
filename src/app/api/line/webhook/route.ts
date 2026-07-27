@@ -23,8 +23,8 @@ function isLineWebhookPayload(value: unknown): value is LineWebhookPayload {
 }
 
 /// The "start a booking" Flex Message, sent in reply whenever a customer texts something
-/// containing "จอง" — points at /book-now (src/lib/channel-booking-adapter.ts, Phase 3), the
-/// same link the WhatsApp webhook sends. Previously pointed at the LIFF booking page
+/// containing "จอง" — points at /book-now (src/lib/channel-booking-adapter.ts, Phase 3).
+/// Previously pointed at the LIFF booking page
 /// (`https://liff.line.me/${NEXT_PUBLIC_LIFF_ID}`), which has been non-functional since LINE
 /// Login/the /account portal were retired (see src/middleware.ts) — /book-now works for a LINE
 /// user the same as anyone else, since it needs no account, just a phone number.

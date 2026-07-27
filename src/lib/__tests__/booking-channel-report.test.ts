@@ -18,18 +18,16 @@ describe("getBookingChannelReport", () => {
   it("uses `channel` when set, falling back to `source` for pre-existing (non-multi-channel) bookings", async () => {
     bookingFindMany.mockResolvedValue([
       booking("LINE", "ONLINE", "2026-01-01T03:00:00.000Z"),
-      booking("WHATSAPP", "ONLINE", "2026-01-01T04:00:00.000Z"),
       booking(null, "WALK_IN", "2026-01-01T05:00:00.000Z"),
       booking(null, "ONLINE", "2026-01-02T05:00:00.000Z"),
     ]);
 
     const report = await getBookingChannelReport({ branchId: "b1", startDate: new Date("2026-01-01"), endDate: new Date("2026-01-03") });
 
-    expect(report.total).toBe(4);
+    expect(report.total).toBe(3);
     expect(report.byChannel).toEqual(
       expect.arrayContaining([
         { channel: "LINE", count: 1 },
-        { channel: "WHATSAPP", count: 1 },
         { channel: "WALK_IN", count: 1 },
         { channel: "ONLINE", count: 1 },
       ])
@@ -43,7 +41,7 @@ describe("getBookingChannelReport", () => {
     bookingFindMany.mockResolvedValue([
       booking("LINE", "ONLINE", "2026-01-01T03:00:00.000Z"),
       booking("LINE", "ONLINE", "2026-01-02T03:00:00.000Z"),
-      booking("WHATSAPP", "ONLINE", "2026-02-01T03:00:00.000Z"),
+      booking("LINE", "ONLINE", "2026-02-01T03:00:00.000Z"),
     ]);
 
     const report = await getBookingChannelReport({ startDate: new Date("2026-01-01"), endDate: new Date("2026-03-01") });
@@ -51,11 +49,11 @@ describe("getBookingChannelReport", () => {
     expect(report.byDay).toEqual([
       { date: "2026-01-01", counts: expect.objectContaining({ LINE: 1 }), total: 1 },
       { date: "2026-01-02", counts: expect.objectContaining({ LINE: 1 }), total: 1 },
-      { date: "2026-02-01", counts: expect.objectContaining({ WHATSAPP: 1 }), total: 1 },
+      { date: "2026-02-01", counts: expect.objectContaining({ LINE: 1 }), total: 1 },
     ]);
     expect(report.byMonth).toEqual([
       { month: "2026-01", counts: expect.objectContaining({ LINE: 2 }), total: 2 },
-      { month: "2026-02", counts: expect.objectContaining({ WHATSAPP: 1 }), total: 1 },
+      { month: "2026-02", counts: expect.objectContaining({ LINE: 1 }), total: 1 },
     ]);
   });
 

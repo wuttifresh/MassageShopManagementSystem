@@ -4,7 +4,6 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { sendLineMessage } from "@/lib/line-messaging";
 import { logNotification } from "@/lib/notification-log";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp-messaging";
 
 // Without this, Next.js would bake in a single prerendered response at build time — a cron
 // endpoint must run fresh every invocation to see the current time and DB state.
@@ -42,16 +41,13 @@ export async function GET(req: NextRequest) {
 
   let remindersSent = 0;
   for (const booking of bookings) {
-    if (!booking.channelCustomer || !booking.channel) continue;
+    if (!booking.channelCustomer || booking.channel !== Channel.LINE) continue;
     const recipient = booking.channelCustomer.channelUserId;
 
-    const result =
-      booking.channel === Channel.LINE
-        ? await sendLineMessage(
-            recipient,
-            `⏰ ใกล้ถึงเวลานัดของคุณแล้ว\nบริการ: ${booking.serviceOption.service.name}\nสาขา: ${booking.branch.name}\nเวลา: ${formatThaiTime(booking.startTime)}`
-          )
-        : await sendReminderTemplate(recipient, booking);
+    const result = await sendLineMessage(
+      recipient,
+      `⏰ ใกล้ถึงเวลานัดของคุณแล้ว\nบริการ: ${booking.serviceOption.service.name}\nสาขา: ${booking.branch.name}\nเวลา: ${formatThaiTime(booking.startTime)}`
+    );
 
     await logNotification({ channel: booking.channel, type: "BOOKING_REMINDER", recipient, bookingId: booking.id, result });
 
@@ -60,25 +56,4 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ remindersSent });
-}
-
-/// WhatsApp forbids free-form proactive messages outside the 24-hour customer-service window, so
-/// unlike the LINE branch above, the 2-hour-ahead reminder must use a pre-approved "utility"
-/// template (multi-channel-booking-prompt.md, Phase 5: "WhatsApp ใช้ utility template").
-async function sendReminderTemplate(
-  waId: string,
-  booking: { branch: { name: string }; serviceOption: { service: { name: string } }; startTime: Date }
-) {
-  const templateName = process.env.WA_REMINDER_TEMPLATE_NAME;
-  if (!templateName) {
-    console.log(`[cron/channel-reminders] WA_REMINDER_TEMPLATE_NAME not configured, would have reminded ${waId}`);
-    return { ok: false as const, error: "WA_REMINDER_TEMPLATE_NAME is not configured" };
-  }
-
-  const languageCode = process.env.WA_REMINDER_TEMPLATE_LANG || "th";
-  return sendWhatsAppTemplateMessage(waId, templateName, languageCode, [
-    booking.serviceOption.service.name,
-    booking.branch.name,
-    formatThaiTime(booking.startTime),
-  ]);
 }

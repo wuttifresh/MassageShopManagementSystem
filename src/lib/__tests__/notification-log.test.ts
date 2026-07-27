@@ -38,23 +38,23 @@ describe("logNotification", () => {
 
   it("falls back to entityType ChannelIdentity keyed on the recipient when there's no booking yet", async () => {
     await logNotification({
-      channel: "WHATSAPP",
+      channel: "LINE",
       type: "FLOW_INVITE",
-      recipient: "66812345678",
-      result: { ok: false, error: "WhatsApp send failed (400): bad request" },
+      recipient: "U5678",
+      result: { ok: false, error: "LINE push failed (400): bad request" },
     });
 
     expect(auditLogCreate).toHaveBeenCalledWith({
       data: {
         action: "SEND_NOTIFICATION",
         entityType: "ChannelIdentity",
-        entityId: "66812345678",
+        entityId: "U5678",
         metadata: {
-          channel: "WHATSAPP",
+          channel: "LINE",
           notificationType: "FLOW_INVITE",
-          recipient: "66812345678",
+          recipient: "U5678",
           status: "FAILED",
-          error: "WhatsApp send failed (400): bad request",
+          error: "LINE push failed (400): bad request",
         },
       },
     });

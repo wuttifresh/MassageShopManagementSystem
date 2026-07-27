@@ -317,7 +317,7 @@ func lockTherapistForBooking(ctx context.Context, tx pgx.Tx, therapistID string)
 
 // upsertChannelCustomer inserts or updates a `customers` row keyed by (channel, channel_user_id)
 // — the same upsert-by-composite-key pattern src/lib/booking-service.ts's createBooking uses for
-// LINE/WhatsApp customers, now shared by the WEB channel (and, later, Phase 3's adapters) too.
+// LINE customers, now shared by the WEB channel (and, later, Phase 3's adapters) too.
 func upsertChannelCustomer(ctx context.Context, tx pgx.Tx, channel, channelUserID, name string, phone *string) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx, `

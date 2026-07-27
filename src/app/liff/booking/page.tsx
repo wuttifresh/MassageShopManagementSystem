@@ -3,7 +3,7 @@ import { getDictionary } from "@/i18n/get-dictionary";
 import { LanguageSwitcher } from "@/i18n/language-switcher";
 import { Alert } from "@/components/ui/alert";
 
-// LINE LIFF booking is temporarily disabled — the shop only takes bookings via WhatsApp for now.
+// LINE LIFF booking is temporarily disabled — new bookings go through /book-now instead.
 // LiffBookingWizard (./liff-booking-wizard.tsx) is left in place unused so this entry point can
 // be flipped back on later.
 export default function LiffBookingPage() {

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 /// Staff-side roles that are allowed to log in with email + password.
 /// CUSTOMER is intentionally excluded — customer-facing login (LINE) has been retired; customers
-/// are served through WhatsApp only now (see src/app/api/bookings/route.ts).
+/// book through /book-now now (see src/app/api/bookings/route.ts).
 const CREDENTIALS_LOGIN_ROLES: Role[] = [Role.OWNER, Role.STAFF, Role.THERAPIST];
 
 export const authOptions: NextAuthOptions = {
