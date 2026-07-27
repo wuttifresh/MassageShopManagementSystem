@@ -92,13 +92,13 @@ type CreateBookingBody = {
   phone?: unknown;
 };
 
-// Web and LINE booking creation are temporarily disabled — the shop only takes new bookings via
-// WhatsApp Flow (src/lib/whatsapp-flow-screens.ts calls createBooking directly, bypassing this
-// route entirely, so it's unaffected). The original handler is kept as createBookingFromWebOrLine
-// below, unused for now, so this can be flipped back on later without rewriting it.
+// Web and LINE booking creation via this route are temporarily disabled — new bookings go through
+// /book-now (src/app/api/book-now/bookings/route.ts) instead. The original handler is kept as
+// createBookingFromWebOrLine below, unused for now, so this can be flipped back on later without
+// rewriting it.
 export async function POST() {
   return NextResponse.json(
-    { error: "ขณะนี้ระบบรับจองผ่าน WhatsApp เท่านั้น กรุณาจองผ่าน WhatsApp ของร้าน" },
+    { error: "ขณะนี้ระบบรับจองผ่านหน้านี้ไม่ได้ กรุณาจองผ่าน /book-now" },
     { status: 403 }
   );
 }

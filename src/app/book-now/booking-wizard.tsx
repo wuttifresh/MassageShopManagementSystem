@@ -16,8 +16,8 @@ type ServiceOption = { id: string; durationMinutes: number; price: string; promo
 type Service = { id: string; name: string; description: string | null; options: ServiceOption[] };
 type Therapist = { id: string; nickname: string; bio: string | null };
 
-type Step = "branch" | "service" | "duration" | "therapist" | "datetime" | "details" | "otp" | "confirm" | "done";
-const STEP_ORDER: Step[] = ["branch", "service", "duration", "therapist", "datetime", "details", "otp", "confirm"];
+type Step = "branch" | "service" | "duration" | "therapist" | "datetime" | "details" | "confirm" | "done";
+const STEP_ORDER: Step[] = ["branch", "service", "duration", "therapist", "datetime", "details", "confirm"];
 
 const DAY_COUNT = 14;
 
@@ -67,8 +67,6 @@ export function BookNowWizard({
   const [time, setTime] = useState<string | null>(null);
   const [guestName, setGuestName] = useState("");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [phoneToken, setPhoneToken] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,53 +145,14 @@ export function BookNowWizard({
       .then((data: { slots: string[] }) => setSlots(data.slots));
   }, [step, branchId, serviceOptionId, date, therapistId]);
 
-  async function handleSendOtp() {
-    setIsLoading(true);
+  function handleContinue() {
+    if (!guestName.trim() || !phone.trim()) return;
     setError(null);
-    try {
-      const res = await fetch("/api/book-now/otp/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        return;
-      }
-      setStep("otp");
-    } catch {
-      setError("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleVerifyOtp() {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/book-now/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), code: otp.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        return;
-      }
-      setPhoneToken(data.phoneToken);
-      setStep("confirm");
-    } catch {
-      setError("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsLoading(false);
-    }
+    setStep("confirm");
   }
 
   async function handleConfirm() {
-    if (!branchId || !serviceOptionId || !date || !time || !phoneToken) return;
+    if (!branchId || !serviceOptionId || !date || !time) return;
     setIsLoading(true);
     setError(null);
 
@@ -209,7 +168,6 @@ export function BookNowWizard({
           time,
           guestName: guestName.trim(),
           phone: phone.trim(),
-          phoneToken,
         }),
       });
       const data = await res.json();
@@ -217,13 +175,6 @@ export function BookNowWizard({
       if (res.status === 409) {
         setError(dict.bookNow.slotTakenDescription);
         setStep("datetime");
-        return;
-      }
-      if (res.status === 401) {
-        // phoneToken expired — send the guest back to re-verify rather than dead-ending here.
-        setError(data.error ?? "กรุณายืนยันเบอร์โทรอีกครั้ง");
-        setPhoneToken(null);
-        setStep("otp");
         return;
       }
       if (!res.ok) {
@@ -391,44 +342,11 @@ export function BookNowWizard({
             type="button"
             size="lg"
             fullWidth
-            isLoading={isLoading}
             disabled={!guestName.trim() || !phone.trim()}
-            onClick={handleSendOtp}
+            onClick={handleContinue}
           >
-            {isLoading ? dict.bookNow.sendingOtp : dict.bookNow.sendOtp}
+            {dict.bookNow.continue}
           </Button>
-        </div>
-      )}
-
-      {step === "otp" && (
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-text-secondary">
-            {dict.bookNow.otpSentDescription} {phone.trim()}
-          </p>
-          <Field label={dict.bookNow.otpLabel} htmlFor="book-now-otp" required>
-            <Input
-              id="book-now-otp"
-              inputMode="numeric"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              placeholder={dict.bookNow.otpPlaceholder}
-            />
-          </Field>
-
-          {error && <Alert variant="danger">{error}</Alert>}
-
-          <Button type="button" size="lg" fullWidth isLoading={isLoading} disabled={otp.length !== 6} onClick={handleVerifyOtp}>
-            {isLoading ? dict.bookNow.verifying : dict.bookNow.verifyOtp}
-          </Button>
-          <div className="flex justify-between text-sm">
-            <button type="button" className="font-medium text-text-secondary hover:text-primary" onClick={() => setStep("details")}>
-              {dict.bookNow.changePhone}
-            </button>
-            <button type="button" className="font-medium text-primary hover:underline" onClick={handleSendOtp}>
-              {dict.bookNow.resendOtp}
-            </button>
-          </div>
         </div>
       )}
 

@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { findAvailableTherapist, getAnyTherapistSlots, getTherapistSlots } from "@/lib/availability";
 
 /// Channel-agnostic booking service (see multi-channel-booking-prompt.md, Phase 1). Both the
-/// existing web booking flow (src/app/book/actions.ts) and the future LINE/WhatsApp entry points
-/// call through here, so overlap protection, customer resolution, and audit logging only exist
-/// in one place. Verifying *who* the caller is (NextAuth session, LINE ID token, WhatsApp signed
-/// payload) happens in the caller — this module only ever receives an already-trusted identity.
+/// existing web booking flow (src/app/book/actions.ts) and the LINE entry points call through
+/// here, so overlap protection, customer resolution, and audit logging only exist in one place.
+/// Verifying *who* the caller is (NextAuth session, LINE ID token) happens in the caller — this
+/// module only ever receives an already-trusted identity.
 
 const MAX_SLOTS = 50;
 const BOOKING_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O/1/I — avoids ambiguity
@@ -82,7 +82,7 @@ export async function getAvailableSlots(input: GetAvailableSlotsInput): Promise<
 }
 
 /// Resolves to an already-existing `User` customer (the current web flow, authenticated via
-/// NextAuth) or upserts a `Customer` row for a new multi-channel booking (LINE LIFF / WhatsApp),
+/// NextAuth) or upserts a `Customer` row for a new multi-channel booking (LINE LIFF),
 /// keyed by the unique (channel, channelUserId) pair — never both.
 export type BookingCustomerIdentity =
   | { type: "user"; userId: string }

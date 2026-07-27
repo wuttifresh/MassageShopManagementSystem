@@ -1,7 +1,6 @@
 /// Normalizes a Thai mobile number to E.164 (e.g. "+66812345678") for use as a Customer
-/// `channelUserId` (Channel.WEB — see /book-now) and as the WhatsApp OTP recipient. Only mobile
-/// numbers are accepted (landlines can't receive a WhatsApp OTP): 10 digits starting with 0,
-/// second digit 6/8/9, e.g. 08X/09X/06X-XXX-XXXX.
+/// `channelUserId` (Channel.WEB — see /book-now). Only mobile numbers are accepted: 10 digits
+/// starting with 0, second digit 6/8/9, e.g. 08X/09X/06X-XXX-XXXX.
 const THAI_MOBILE_LOCAL = /^0[689]\d{8}$/;
 const THAI_MOBILE_INTL = /^\+66[689]\d{8}$/;
 const THAI_MOBILE_INTL_NO_PLUS = /^66[689]\d{8}$/;

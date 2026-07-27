@@ -119,7 +119,7 @@ function) — deploy แยกจาก Next.js app ไป Fly.io เพรา�
 4. เช็คว่า deploy สำเร็จ: `curl https://<app-name>.fly.dev/healthz` ต้องได้ `{"ok":true}`
 5. อัปเดต `BOOKING_CORE_URL` ใน Vercel Environment Variables (Production + Preview) ให้เป็น
    `https://<app-name>.fly.dev` แล้ว redeploy Next.js app — `/book-now` และ webhook ของ
-   WhatsApp/LINE จะเริ่มเรียก service นี้แทนค่า `.env.example` ตอน local dev
+   LINE จะเริ่มเรียก service นี้แทนค่า `.env.example` ตอน local dev
 
 **หมายเหตุ**:
 - `fly.toml` ตั้ง `min_machines_running = 0` (auto-stop เมื่อไม่มี traffic) เพื่อประหยัดค่าใช้จ่าย

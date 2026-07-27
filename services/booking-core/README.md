@@ -11,9 +11,9 @@ availability + create, via `src/lib/booking-core-client.ts` proxied through
 Cancel/reschedule/lookup for `/book-now` still go through the TypeScript `booking-service.ts`
 directly (unchanged) — only availability + create moved.
 
-**Phase 3 update**: WhatsApp/LINE webhooks (`src/app/api/whatsapp/webhook`,
-`src/app/api/line/webhook`) reply with a link to `/book-now` rather than calling this service
-directly yet — see `src/lib/channel-booking-adapter.ts` for the shared adapter both channels use.
+**Phase 3 update**: the LINE webhook (`src/app/api/line/webhook`) replies with a link to
+`/book-now` rather than calling this service directly yet — see
+`src/lib/channel-booking-adapter.ts` for the shared adapter.
 
 **Phase 4 update**: POS (`/dashboard/pos`) sells against the Prisma-side `Queue`/`Booking` records
 this service creates; it doesn't call this service directly.
@@ -38,7 +38,7 @@ agree, not just that they're supposed to.
   channelUserId, guestName, guestPhone}`. `therapistId` empty = pick any available therapist.
   `channel`+`channelUserId` set together upsert a `customers` row (channel, channel_user_id) and
   link it via the booking's `channel_customer_id` — e.g. `/book-now` sends `channel: "WEB"`,
-  `channelUserId: <OTP-verified phone>` — matching how LINE/WhatsApp customers already work in
+  `channelUserId: <normalized phone>` — matching how LINE customers already work in
   `src/lib/booking-service.ts`, so Phase 3's channel adapters can reuse this same endpoint instead
   of a separate one. Both empty = the legacy `guest_name`/`guest_phone` path instead. Returns 409
   if the slot is taken, 400 on validation errors.

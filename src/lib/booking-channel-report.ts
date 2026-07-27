@@ -19,7 +19,7 @@ function resolveChannelKey(booking: { channel: string | null; source: string }):
 }
 
 function emptyCounts(): Record<BookingChannelKey, number> {
-  return { LINE: 0, WHATSAPP: 0, ONLINE: 0, WALK_IN: 0, PHONE: 0, ADMIN: 0 };
+  return { LINE: 0, ONLINE: 0, WALK_IN: 0, PHONE: 0, ADMIN: 0 };
 }
 
 /// Counts bookings by channel for a branch/date range — multi-channel-booking-prompt.md, Phase 6

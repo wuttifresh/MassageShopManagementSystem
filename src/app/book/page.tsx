@@ -3,7 +3,7 @@ import { getDictionary } from "@/i18n/get-dictionary";
 import { LanguageSwitcher } from "@/i18n/language-switcher";
 import { Alert } from "@/components/ui/alert";
 
-// Web booking is temporarily disabled — the shop only takes bookings via WhatsApp for now.
+// Web booking is temporarily disabled — new bookings go through /book-now instead.
 // BookingWizard (./booking-wizard.tsx) and its server action (./actions.ts) are left in place
 // unused so this entry point can be flipped back on later.
 export default async function BookPage() {

@@ -30,7 +30,7 @@ export const TransactionStatus = { PENDING: "PENDING", PAID: "PAID", VOIDED: "VO
 
 export const CommissionType = { PERCENTAGE: "PERCENTAGE", FIXED_AMOUNT: "FIXED_AMOUNT" } as const;
 
-export const Channel = { LINE: "LINE", WHATSAPP: "WHATSAPP", WEB: "WEB" } as const;
+export const Channel = { LINE: "LINE", WEB: "WEB" } as const;
 
 export const BookingSource = { ONLINE: "ONLINE", WALK_IN: "WALK_IN", PHONE: "PHONE", ADMIN: "ADMIN" } as const;
 

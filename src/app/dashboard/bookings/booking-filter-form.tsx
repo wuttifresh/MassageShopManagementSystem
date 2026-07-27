@@ -11,7 +11,6 @@ type Branch = { id: string; name: string };
 
 const CHANNEL_LABEL: Record<BookingChannelKey, string> = {
   LINE: "LINE",
-  WHATSAPP: "WhatsApp",
   ONLINE: "เว็บไซต์",
   WALK_IN: "หน้าร้าน",
   PHONE: "โทรศัพท์",

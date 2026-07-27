@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { normalizeThaiMobile } from "@/lib/phone";
-import { verifyGuestPhoneToken } from "@/lib/guest-phone-token";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { BookingValidationError, SlotTakenError } from "@/lib/booking-service";
 import { createBookingViaCore } from "@/lib/booking-core-client";
@@ -25,15 +24,14 @@ type CreateGuestBookingBody = {
   time?: unknown;
   guestName?: unknown;
   phone?: unknown;
-  phoneToken?: unknown;
 };
 
-/// Creates a booking for a guest with no account (public /book-now, no login) — the "identity" is
-/// a phone number OTP-verified moments earlier via /api/book-now/otp/*, proven here by
-/// `phoneToken` rather than trusting the client-supplied `phone` outright (coding rule #5,
-/// extended to this channel). Delegates overlap protection, customer upsert, and audit logging to
-/// services/booking-core (the Go/Fiber Phase 1 service) via createBookingViaCore — see the Phase 2
-/// plan for why this moved off the TypeScript createBooking in booking-service.ts.
+/// Creates a booking for a guest with no account (public /book-now, no login) — identity is just
+/// the client-supplied guestName/phone, same trust level as booking-service.ts's other guest
+/// lookup paths (no OTP/verification step). Delegates overlap protection, customer upsert, and
+/// audit logging to services/booking-core (the Go/Fiber Phase 1 service) via createBookingViaCore
+/// — see the Phase 2 plan for why this moved off the TypeScript createBooking in
+/// booking-service.ts.
 export async function POST(request: Request) {
   let body: CreateGuestBookingBody;
   try {
@@ -49,7 +47,6 @@ export async function POST(request: Request) {
   if (!isNonEmptyString(body.time)) missing.push("time");
   if (!isNonEmptyString(body.guestName)) missing.push("guestName");
   if (!isNonEmptyString(body.phone)) missing.push("phone");
-  if (!isNonEmptyString(body.phoneToken)) missing.push("phoneToken");
   if (missing.length > 0) {
     return NextResponse.json({ error: `กรุณาระบุข้อมูลให้ครบ: ${missing.join(", ")}` }, { status: 400 });
   }
@@ -66,15 +63,6 @@ export async function POST(request: Request) {
   const phone = normalizeThaiMobile(body.phone as string);
   if (!phone) {
     return NextResponse.json({ error: "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง" }, { status: 400 });
-  }
-
-  const secret = process.env.GUEST_PHONE_TOKEN_SECRET;
-  if (!secret) throw new Error("GUEST_PHONE_TOKEN_SECRET is not configured");
-  if (!verifyGuestPhoneToken(body.phoneToken as string, phone, secret)) {
-    return NextResponse.json(
-      { error: "ยืนยันเบอร์โทรศัพท์หมดอายุหรือไม่ถูกต้อง กรุณาขอรหัส OTP ใหม่" },
-      { status: 401 }
-    );
   }
 
   const rateLimit = checkRateLimit(`book-now-create-booking:${phone}`, CREATE_BOOKING_LIMIT, CREATE_BOOKING_WINDOW_MS);

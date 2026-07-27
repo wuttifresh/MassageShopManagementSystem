@@ -20,7 +20,7 @@ export type NotificationLogInput = {
 /// (multi-channel-booking-prompt.md, Phase 5, "ทุก outbound message ลง log พร้อม status").
 /// Reuses AuditLog rather than a new table — see the AuditAction.SEND_NOTIFICATION doc comment in
 /// schema.prisma for why. Never throws: losing an audit trail row must not break the notification
-/// send (or the booking flow) it's attached to, matching sendLineMessage/sendWhatsApp*'s own
+/// send (or the booking flow) it's attached to, matching sendLineMessage's own
 /// never-break-the-caller contract.
 export async function logNotification(input: NotificationLogInput): Promise<void> {
   try {
