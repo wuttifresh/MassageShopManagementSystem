@@ -31,10 +31,55 @@ function nextDays(count: number): Date[] {
   return Array.from({ length: count }, (_, i) => new Date(base.getTime() + i * 86_400_000));
 }
 
+/// Resolves the branch/service+duration a share link's `?branch=`/`?option=` points at (if any)
+/// against the already-loaded branches/services, and picks which step to start the wizard on —
+/// run once against server-fetched data instead of after a client-side fetch resolves, so the
+/// wizard opens straight on the right step instead of flashing the branch-picker first.
+function resolveInitialSelection(
+  branches: Branch[],
+  services: Service[],
+  initialBranchSlug?: string,
+  initialServiceOptionId?: string
+): { step: Step; branchId: string | null; serviceId: string | null; serviceOptionId: string | null } {
+  const matchedBranch = initialBranchSlug
+    ? (branches.find((b) => b.slug === initialBranchSlug) ?? null)
+    : branches.length === 1
+      ? branches[0]
+      : null;
+
+  let matchedService: Service | null = null;
+  let matchedOption: ServiceOption | null = null;
+  if (initialServiceOptionId) {
+    for (const s of services) {
+      const opt = s.options.find((o) => o.id === initialServiceOptionId);
+      if (opt) {
+        matchedService = s;
+        matchedOption = opt;
+        break;
+      }
+    }
+  }
+
+  const step: Step = matchedBranch && matchedService && matchedOption ? "therapist" : matchedBranch ? "service" : "branch";
+
+  return {
+    step,
+    branchId: matchedBranch?.id ?? null,
+    serviceId: matchedService?.id ?? null,
+    serviceOptionId: matchedOption?.id ?? null,
+  };
+}
+
 export function BookNowWizard({
+  initialBranches,
+  initialServices,
   initialBranchSlug,
   initialServiceOptionId,
 }: {
+  /// Branches/services fetched server-side by book-now/page.tsx — the wizard never fetches these
+  /// itself, so there's no client-side round trip for them.
+  initialBranches: Branch[];
+  initialServices: Service[];
   /// Preselects a branch by its stable `slug` (from a "ลิงก์ร้าน" share link) — skips the branch
   /// step entirely once resolved. See /dashboard/booking-links.
   initialBranchSlug?: string;
@@ -53,15 +98,24 @@ export function BookNowWizard({
     [intlLocale]
   );
 
-  const [step, setStep] = useState<Step>("branch");
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const initialSelection = useMemo(
+    () => resolveInitialSelection(initialBranches, initialServices, initialBranchSlug, initialServiceOptionId),
+    // Only ever computed once on mount — initialBranches/initialServices/initialBranchSlug/
+    // initialServiceOptionId come from the server render and don't change during the wizard's
+    // lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const [step, setStep] = useState<Step>(initialSelection.step);
+  const [branches] = useState<Branch[]>(initialBranches);
+  const [services] = useState<Service[]>(initialServices);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
 
-  const [branchId, setBranchId] = useState<string | null>(null);
-  const [serviceId, setServiceId] = useState<string | null>(null);
-  const [serviceOptionId, setServiceOptionId] = useState<string | null>(null);
+  const [branchId, setBranchId] = useState<string | null>(initialSelection.branchId);
+  const [serviceId, setServiceId] = useState<string | null>(initialSelection.serviceId);
+  const [serviceOptionId, setServiceOptionId] = useState<string | null>(initialSelection.serviceOptionId);
   const [therapistId, setTherapistId] = useState<string | null | "ANY">("ANY");
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
@@ -77,53 +131,6 @@ export function BookNowWizard({
   const selectedOption = selectedService?.options.find((o) => o.id === serviceOptionId) ?? null;
   const selectedBranch = branches.find((b) => b.id === branchId) ?? null;
   const selectedTherapist = therapists.find((t) => t.id === therapistId) ?? null;
-
-  // Loads branches + services up front (not gated on step) so a share link's `?branch=`/`?option=`
-  // can resolve and skip steps before the user ever sees them, instead of only after they'd
-  // normally have reached that step.
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/branches").then((r) => r.json()) as Promise<{ branches: Branch[] }>,
-      fetch("/api/services").then((r) => r.json()) as Promise<{ services: Service[] }>,
-    ]).then(([branchesData, servicesData]) => {
-      setBranches(branchesData.branches);
-      setServices(servicesData.services);
-
-      const matchedBranch = initialBranchSlug
-        ? branchesData.branches.find((b) => b.slug === initialBranchSlug)
-        : branchesData.branches.length === 1
-          ? branchesData.branches[0]
-          : null;
-
-      let matchedService: Service | null = null;
-      let matchedOption: ServiceOption | null = null;
-      if (initialServiceOptionId) {
-        for (const s of servicesData.services) {
-          const opt = s.options.find((o) => o.id === initialServiceOptionId);
-          if (opt) {
-            matchedService = s;
-            matchedOption = opt;
-            break;
-          }
-        }
-      }
-
-      if (matchedBranch) setBranchId(matchedBranch.id);
-      if (matchedService && matchedOption) {
-        setServiceId(matchedService.id);
-        setServiceOptionId(matchedOption.id);
-      }
-
-      if (matchedBranch && matchedService && matchedOption) {
-        setStep("therapist");
-      } else if (matchedBranch) {
-        setStep("service");
-      }
-    });
-    // Only ever runs once on mount — initialBranchSlug/initialServiceOptionId come from the URL
-    // and don't change during the wizard's lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (step !== "therapist" || !branchId || !serviceId) return;
