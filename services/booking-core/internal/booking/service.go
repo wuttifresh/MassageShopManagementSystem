@@ -110,19 +110,42 @@ func (s *Service) GetAvailableSlots(ctx context.Context, branchID, serviceOption
 	return slots, nil
 }
 
+// getAnyTherapistSlots unions every eligible therapist's free slots. Fetches each therapist's
+// working window and busy ranges in two batched round trips (getWorkingWindowsBulk,
+// getBusyRangesBulk) rather than looping GetTherapistSlots once per therapist — the loop used to
+// cost 3 sequential DB round trips per eligible therapist, which is what made this endpoint slow
+// on any branch with more than a couple of staff.
 func (s *Service) getAnyTherapistSlots(ctx context.Context, branchID, serviceID string, date time.Time, durationMinutes int) ([]time.Time, error) {
 	therapists, err := getEligibleTherapists(ctx, s.pool, branchID, serviceID)
 	if err != nil {
 		return nil, err
 	}
+	if len(therapists) == 0 {
+		return nil, nil
+	}
 
+	ids := make([]string, len(therapists))
+	for i, t := range therapists {
+		ids[i] = t.ID
+	}
+
+	windows, err := getWorkingWindowsBulk(ctx, s.pool, ids, date)
+	if err != nil {
+		return nil, err
+	}
+	busy, err := getBusyRangesBulk(ctx, s.pool, ids, date)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
 	unique := map[int64]time.Time{}
-	for _, t := range therapists {
-		slots, err := s.GetTherapistSlots(ctx, t.ID, date, durationMinutes)
-		if err != nil {
-			return nil, err
+	for _, id := range ids {
+		window, ok := windows[id]
+		if !ok {
+			continue
 		}
-		for _, slot := range slots {
+		for _, slot := range generateCandidateSlots(window, durationMinutes, busy[id], now) {
 			unique[slot.UnixNano()] = slot
 		}
 	}

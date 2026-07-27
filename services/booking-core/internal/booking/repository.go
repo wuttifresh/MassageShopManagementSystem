@@ -201,6 +201,104 @@ func getBusyRanges(ctx context.Context, ex Executor, therapistID string, date ti
 	return append(booked, blocked...), nil
 }
 
+// getWorkingWindowsBulk is the batched form of getWorkingWindow: one round trip for every
+// therapist in `therapistIDs` instead of one per therapist. Used by getAnyTherapistSlots (the
+// "คนไหนก็ได้" path), which previously called getWorkingWindow/getBusyRanges once per eligible
+// therapist in a sequential loop — fine for one therapist, but O(N) DB round trips for N
+// therapists is what made /v1/availability slow on branches with more than a couple of staff.
+// Therapists with no schedule row, or a non-WORKING day, are simply absent from the result map.
+func getWorkingWindowsBulk(ctx context.Context, ex Executor, therapistIDs []string, date time.Time) (map[string]TimeRange, error) {
+	rows, err := ex.Query(ctx, `
+		SELECT therapist_id, status, start_time, end_time FROM therapist_schedules
+		WHERE therapist_id = ANY($1) AND date = $2`,
+		therapistIDs, date,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string]TimeRange{}
+	for rows.Next() {
+		var id, status string
+		var startStr, endStr *string
+		if err := rows.Scan(&id, &status, &startStr, &endStr); err != nil {
+			return nil, err
+		}
+		if status != "WORKING" || startStr == nil || endStr == nil {
+			continue
+		}
+		start, err := combineDateAndTime(date, *startStr)
+		if err != nil {
+			return nil, err
+		}
+		end, err := combineDateAndTime(date, *endStr)
+		if err != nil {
+			return nil, err
+		}
+		out[id] = TimeRange{Start: start, End: end}
+	}
+	return out, rows.Err()
+}
+
+// getBusyRangesBulk is the batched form of getBusyRanges — active bookings and time blocks for
+// every id in `therapistIDs`, keyed by therapist id, in two round trips total instead of two per
+// therapist.
+func getBusyRangesBulk(ctx context.Context, ex Executor, therapistIDs []string, date time.Time) (map[string][]TimeRange, error) {
+	dayStart := date
+	dayEnd := date.Add(24 * time.Hour)
+
+	bookedRows, err := ex.Query(ctx, `
+		SELECT therapist_id, start_time, end_time FROM bookings
+		WHERE therapist_id = ANY($1) AND deleted_at IS NULL AND status IN ('PENDING', 'CONFIRMED')
+		  AND start_time < $2 AND end_time > $3`,
+		therapistIDs, dayEnd, dayStart,
+	)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]TimeRange{}
+	for bookedRows.Next() {
+		var id string
+		var r TimeRange
+		if err := bookedRows.Scan(&id, &r.Start, &r.End); err != nil {
+			bookedRows.Close()
+			return nil, err
+		}
+		out[id] = append(out[id], r)
+	}
+	bookedRows.Close()
+	if err := bookedRows.Err(); err != nil {
+		return nil, err
+	}
+
+	blockRows, err := ex.Query(ctx, `
+		SELECT therapist_id, start_time, end_time FROM therapist_time_blocks
+		WHERE therapist_id = ANY($1) AND date = $2`,
+		therapistIDs, date,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer blockRows.Close()
+	for blockRows.Next() {
+		var id, startStr, endStr string
+		if err := blockRows.Scan(&id, &startStr, &endStr); err != nil {
+			return nil, err
+		}
+		start, err := combineDateAndTime(date, startStr)
+		if err != nil {
+			return nil, err
+		}
+		end, err := combineDateAndTime(date, endStr)
+		if err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], TimeRange{Start: start, End: end})
+	}
+	return out, blockRows.Err()
+}
+
 // lockTherapistForBooking serializes every concurrent booking attempt for this therapist within
 // the current transaction via a Postgres advisory lock keyed by therapist id — this is the "row
 // lock ตอน confirm" the Phase 1 brief asks for. It's released automatically when the transaction

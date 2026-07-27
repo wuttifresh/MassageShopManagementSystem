@@ -371,6 +371,71 @@ func TestGetAvailableSlots_ExcludesTimeBlock(t *testing.T) {
 	}
 }
 
+// TestGetAvailableSlots_AnyTherapist_UnionAcrossTherapists exercises getAnyTherapistSlots's
+// batched query path (getWorkingWindowsBulk/getBusyRangesBulk) with more than one eligible
+// therapist, proving the union behaves the same as the old per-therapist loop: a slot stays
+// available as long as at least one eligible therapist is free for it.
+func TestGetAvailableSlots_AnyTherapist_UnionAcrossTherapists(t *testing.T) {
+	pool := testPool(t)
+	f := setupFixture(t, pool)
+	svc := NewService(pool)
+	ctx := context.Background()
+
+	therapist2ID := uuid.NewString()
+	mustExec(t, ctx, pool, `
+		INSERT INTO therapists (id, branch_id, nickname, commission_rate, updated_at)
+		VALUES ($1, $2, 'Test Therapist 2', 40, now())`, therapist2ID, f.BranchID)
+	mustExec(t, ctx, pool, `
+		INSERT INTO therapist_schedules (id, therapist_id, branch_id, date, start_time, end_time, updated_at)
+		VALUES ($1, $2, $3, $4, '00:00', '23:30', now())`,
+		uuid.NewString(), therapist2ID, f.BranchID, f.Date)
+	t.Cleanup(func() {
+		mustExec(t, context.Background(), pool, `DELETE FROM therapist_schedules WHERE therapist_id = $1`, therapist2ID)
+		mustExec(t, context.Background(), pool, `DELETE FROM therapists WHERE id = $1`, therapist2ID)
+	})
+
+	// Book the original therapist at 15:00, leaving therapist 2 free at that time.
+	if _, err := svc.CreateBooking(ctx, CreateInput{
+		BranchID:        f.BranchID,
+		ServiceOptionID: f.ServiceOptionID,
+		TherapistID:     f.TherapistID,
+		Date:            f.Date.Format("2006-01-02"),
+		Time:            "15:00",
+		Customer:        CustomerIdentity{Name: "Somchai"},
+	}); err != nil {
+		t.Fatalf("CreateBooking: %v", err)
+	}
+
+	// "any therapist" (empty TherapistID) should still offer 15:00, backed by therapist 2 alone.
+	slots, err := svc.GetAvailableSlots(ctx, f.BranchID, f.ServiceOptionID, "", f.Date)
+	if err != nil {
+		t.Fatalf("GetAvailableSlots: %v", err)
+	}
+	if !containsTime(slots, "15:00") {
+		t.Errorf("expected 15:00 to still be available via the second therapist, got slots: %v", slots)
+	}
+
+	// Now book therapist 2 at 15:00 too — nobody is free anymore.
+	if _, err := svc.CreateBooking(ctx, CreateInput{
+		BranchID:        f.BranchID,
+		ServiceOptionID: f.ServiceOptionID,
+		TherapistID:     therapist2ID,
+		Date:            f.Date.Format("2006-01-02"),
+		Time:            "15:00",
+		Customer:        CustomerIdentity{Name: "Malee"},
+	}); err != nil {
+		t.Fatalf("CreateBooking (therapist 2): %v", err)
+	}
+
+	slots, err = svc.GetAvailableSlots(ctx, f.BranchID, f.ServiceOptionID, "", f.Date)
+	if err != nil {
+		t.Fatalf("GetAvailableSlots (after both booked): %v", err)
+	}
+	if containsTime(slots, "15:00") {
+		t.Errorf("15:00 should no longer be available once both eligible therapists are booked")
+	}
+}
+
 func containsTime(slots []time.Time, hhmm string) bool {
 	for _, s := range slots {
 		if s.Format("15:04") == hhmm {
